@@ -1,0 +1,10 @@
+*.o
+*.so
+*~
+*.swp
+*TAGS
+*.orig
+*.rej
+*.bak
+dplfs
+
