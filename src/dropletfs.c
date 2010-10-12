@@ -220,16 +220,29 @@ static void droplet_pp(dpl_ctx_t *ctx)
 #undef PP
 }
 
+static void
+usage(const char * const prog)
+{
+        printf("Usage: %s <bucket> <mount point>\n", prog);
+}
 
 int main(int argc, char **argv)
 {
-        char *default_bucket = "poz";
         int rc = EXIT_FAILURE;
-
-        if (argc > 2) {
-                default_bucket = argv[argc+1];
-                argc -= 1;
+        char *default_bucket = "poz";
+        fp = fopen("/tmp/fuse.log", "a");
+        if (! fp) {
+                goto err0;
         }
+
+        if (argc < 3) {
+                usage(argv[0]);
+                goto err1;
+        }
+
+        default_bucket = argv[1];
+        argc -= 1;
+        argv += 1;
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
@@ -241,14 +254,12 @@ int main(int argc, char **argv)
 
 	ctx = dpl_ctx_new(NULL, NULL);
 	if (! ctx) {
-          goto err2;
+                goto err2;
 	}
 
         ctx->trace_level = ~0;
         ctx->cur_bucket = strdup(default_bucket);
         droplet_pp(ctx);
-
-        fp = fopen("/tmp/fuse.log", "a");
 
         rc = dfs_fuse_main(&args);
         dpl_ctx_free(ctx);
@@ -256,7 +267,7 @@ err2:
 	dpl_free();
 err1:
         fclose(fp);
-
+err0:
 	return rc;
 }
 
