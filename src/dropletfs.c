@@ -27,6 +27,7 @@ dfs_getattr(const char *path,
 {
 
         dpl_dict_t *metadata = NULL;
+
         dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_SUCCESS != rc) {
@@ -122,12 +123,12 @@ dfs_opendir(const char *path,
 int
 dfs_statfs(const char *path, struct statvfs *buf)
 {
-        buf->f_flag = ST_RDONLY|8;
+        buf->f_flag = ST_RDONLY;
         buf->f_namemax = 255;
         buf->f_bsize = 4096;
         buf->f_frsize = buf->f_bsize;
         buf->f_blocks = buf->f_bfree = buf->f_bavail =
-                1000ULL * 1024 * 1024 * 1024 / buf->f_frsize;
+                1000ULL * 1024 / buf->f_frsize;
         buf->f_files = buf->f_ffree = 1000000000;
 
         return 0;
@@ -157,6 +158,7 @@ struct fuse_operations dfs_ops = {
         .opendir    = dfs_opendir,
         .unlink     = dfs_unlink,
         .rmdir      = dfs_rmdir,
+        .statfs     = dfs_statfs,
 
         /* not implemented yet */
         .readlink   = dfs_readlink,
@@ -171,7 +173,6 @@ struct fuse_operations dfs_ops = {
         .fsync      = dfs_fsync,
         .release    = dfs_release,
         .read       = dfs_read,
-        .statfs     = dfs_statfs,
 
         .getdir     = NULL, /* deprecated */
         .link       = NULL, /* no support needed */
@@ -180,11 +181,7 @@ struct fuse_operations dfs_ops = {
 
 static int dfs_fuse_main(struct fuse_args *args)
 {
-#if FUSE_VERSION >= 26
         return fuse_main(args->argc, args->argv, &dfs_ops, NULL);
-#else
-        return fuse_main(args->argc, args->argv, &dfs_ops);
-#endif
 }
 
 
@@ -226,8 +223,15 @@ static void droplet_pp(dpl_ctx_t *ctx)
 
 int main(int argc, char **argv)
 {
-        struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+        char *default_bucket = "poz";
         int rc = EXIT_FAILURE;
+
+        if (argc > 2) {
+                default_bucket = argv[argc+1];
+                argc -= 1;
+        }
+
+        struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	dpl_status_t st = dpl_init();
 	if (DPL_SUCCESS != st) {
@@ -240,7 +244,10 @@ int main(int argc, char **argv)
           goto err2;
 	}
 
+        ctx->trace_level = ~0;
+        ctx->cur_bucket = strdup(default_bucket);
         droplet_pp(ctx);
+
         fp = fopen("/tmp/fuse.log", "a");
 
         rc = dfs_fuse_main(&args);
