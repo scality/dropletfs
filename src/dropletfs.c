@@ -3,6 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <assert.h>
 #include <sys/statvfs.h>
 
 #define FUSE_USE_VERSION 29
@@ -11,6 +12,14 @@
 
 dpl_ctx_t *ctx;
 FILE *fp;
+static mode_t root_mode = 0;
+static int debug = 0;
+
+#define LOG(fmt, ...) do {                                              \
+        if (debug)                                                      \
+                fprintf(fp, "%s:%s():%d -- " fmt "\n",                  \
+                        __FILE__, __func__, __LINE__, ##__VA_ARGS__);   \
+} while (/*CONSTCOND*/0)
 
 #define DPL_CHECK_ERR(func, rc, path) do {                              \
         if (DPL_SUCCESS != rc) {                                        \
@@ -18,15 +27,40 @@ FILE *fp;
                         (int)time(NULL), path, dpl_status_str(rc));     \
                 return -1;                                              \
         }                                                               \
-} while(0)
+} while(/*CONSTCOND*/0)
 
 
 int
 dfs_getattr(const char *path,
             struct stat *buf)
 {
+        LOG("path=%s, buf=%p", path, (void *)buf);
+
+        assert(buf);
+        memset(buf, 0, sizeof *buf);
 
         dpl_dict_t *metadata = NULL;
+
+        /*
+         * why setting st_nlink to 1?
+         * see http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FAQ
+         * Section 3.3.5 "Why doesn't find work on my filesystem?"
+         */
+        buf->st_nlink = 1;
+
+	if (strcmp(path, "/") == 0) {
+		buf->st_mode = root_mode | S_IFDIR;
+                return 0;
+	}
+
+        /*
+         * TODO: in order to fill the other structure fields, we'd like to
+         * parse the http headers, thus grab meta-data info, such as:
+         *  -  x-amz-meta-mode
+         *  -  x-amz-meta-mtime
+         *     ...
+         *
+         */
 
         dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
 
@@ -46,6 +80,8 @@ int
 dfs_mkdir(const char *path,
           mode_t mode)
 {
+        LOG("path=%s, mode=%d", path, (int)mode);
+
         dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_mkdir, rc, path);
 
@@ -55,6 +91,8 @@ dfs_mkdir(const char *path,
 int
 dfs_rmdir(const char *path)
 {
+        LOG("path=%s", path);
+
         dpl_status_t rc = dpl_rmdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_rmdir, rc, path);
 
@@ -64,6 +102,8 @@ dfs_rmdir(const char *path)
 int
 dfs_unlink(const char *path)
 {
+        LOG("path=%s", path);
+
         dpl_status_t rc = dpl_unlink(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_unlink, rc, path);
 
@@ -77,6 +117,9 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, info=%p",
+            path, (void *)buf, size, (long long)offset, (void *)info);
+
         /* missing parameters */
         dpl_status_t rc = dpl_write(NULL, (char *)buf, size);
         DPL_CHECK_ERR(dpl_write, rc, path);
@@ -91,6 +134,9 @@ dfs_readdir(const char *path,
             off_t offset,
             struct fuse_file_info *info)
 {
+        LOG("path=%s, data=%p, fill=%p, offset=%lld, info=%p",
+            path, data, (void *)fill, (long long)offset, (void *)info);
+
         void *dir_hdl;
         dpl_dirent_t dirent;
 
@@ -113,6 +159,8 @@ int
 dfs_opendir(const char *path,
             struct fuse_file_info *info)
 {
+        LOG("path=%s, info=%p", path, (void *)info);
+
         void *dir_hdl;
         dpl_status_t rc = dpl_opendir(ctx, (char *)path, &dir_hdl);
         DPL_CHECK_ERR(dpl_opendir, rc, path);
@@ -120,9 +168,12 @@ dfs_opendir(const char *path,
         return 0;
 }
 
+
 int
 dfs_statfs(const char *path, struct statvfs *buf)
 {
+        LOG("path=%s, buf=%p", path, (void *)buf);
+
         buf->f_flag = ST_RDONLY;
         buf->f_namemax = 255;
         buf->f_bsize = 4096;
@@ -133,6 +184,8 @@ dfs_statfs(const char *path, struct statvfs *buf)
 
         return 0;
 }
+
+
 
 int dfs_mknod(const char *path, mode_t mode) { return 0; }
 int dfs_readlink(const char *path, char *buf, size_t bufsiz) { return 0; }
@@ -179,13 +232,15 @@ struct fuse_operations dfs_ops = {
 };
 
 
-static int dfs_fuse_main(struct fuse_args *args)
+static int
+dfs_fuse_main(struct fuse_args *args)
 {
         return fuse_main(args->argc, args->argv, &dfs_ops, NULL);
 }
 
 
-static void droplet_pp(dpl_ctx_t *ctx)
+static void
+droplet_pp(dpl_ctx_t *ctx)
 {
 #define PP(field, fmt) fprintf(stdout, #field": "fmt"\n", ctx->field)
         PP(n_conn_buckets, "%d");
@@ -226,10 +281,11 @@ usage(const char * const prog)
         printf("Usage: %s <bucket> <mount point>\n", prog);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
         int rc = EXIT_FAILURE;
-        char *default_bucket = "poz";
+        char *bucket = NULL;
         fp = fopen("/tmp/fuse.log", "a");
         if (! fp) {
                 goto err0;
@@ -240,9 +296,15 @@ int main(int argc, char **argv)
                 goto err1;
         }
 
-        default_bucket = argv[1];
+        bucket = argv[1];
         argc -= 1;
         argv += 1;
+
+        if (0 == strncmp(argv[1], "-d", 2)) {
+                debug = 1;
+                argc -= 1;
+                argv += 1;
+        }
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
@@ -258,7 +320,7 @@ int main(int argc, char **argv)
 	}
 
         ctx->trace_level = ~0;
-        ctx->cur_bucket = strdup(default_bucket);
+        ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
         rc = dfs_fuse_main(&args);
