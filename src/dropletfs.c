@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,10 +11,11 @@
 #include <fuse.h>
 #include <droplet.h>
 
+
 dpl_ctx_t *ctx;
 FILE *fp;
 static mode_t root_mode = 0;
-static int debug = 0;
+static bool debug = false;
 
 #define LOG(fmt, ...)                                                   \
         do {                                                            \
@@ -61,15 +63,6 @@ dfs_getattr(const char *path,
 		buf->st_mode = root_mode | S_IFDIR;
                 return 0;
 	}
-
-        /*
-         * TODO: in order to fill the other structure fields, we'd like to
-         * parse the http headers, thus grab meta-data info, such as:
-         *  -  x-amz-meta-mode
-         *  -  x-amz-meta-mtime
-         *     ...
-         *
-         */
 
         dpl_ftype_t type;
         dpl_ino_t ino, parent_ino, obj_ino;
@@ -341,7 +334,7 @@ main(int argc, char **argv)
         argv += 1;
 
         if (0 == strncmp(argv[1], "-d", 2)) {
-                debug = 1;
+                debug = true;
                 argc -= 1;
                 argv += 1;
         }
