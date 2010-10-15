@@ -71,12 +71,32 @@ dfs_getattr(const char *path,
          *
          */
 
-        dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
+        dpl_ftype_t type;
+        dpl_ino_t ino, parent_ino, obj_ino;
 
-        if (DPL_SUCCESS != rc) {
-                fprintf(fp, "%d - dpl_getattr %s: %s\n",
-                        (int)time(NULL), path, dpl_status_str(rc));
+        dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
+                                    ino, &parent_ino, &obj_ino, &type);
+
+        LOG("dpl_namei returned %s (%d), type = %s",
+            dpl_status_str(rc), rc, dfs_ftypetostr(type));
+
+        if (DPL_SUCCESS != rc)
+                goto err;
+
+        switch (type) {
+        case DPL_FTYPE_DIR:
+                buf->st_mode = S_IFDIR;
+                break;
+        case DPL_FTYPE_REG:
+                buf->st_mode = S_IFREG;
+                break;
         }
+
+        rc = dpl_getattr(ctx, (char *)path, &metadata);
+        if (DPL_SUCCESS != rc)
+                LOG("dpl_getattr %s: %s\n", path, dpl_status_str(rc));
+
+  err:
 
         if (metadata)
                 free(metadata);
@@ -136,6 +156,15 @@ dfs_write(const char *path,
         return 0;
 }
 
+static int fuse_filler(void *buf,
+                       const char *name,
+                       const struct stat *stbuf,
+                       off_t off)
+{
+        return 0;
+}
+
+
 int
 dfs_readdir(const char *path,
             void *data,
@@ -155,8 +184,10 @@ dfs_readdir(const char *path,
         rc = dpl_opendir(ctx, ".", &dir_hdl);
         DPL_CHECK_ERR(dpl_opendir, rc, ".");
 
-        rc = dpl_readdir(dir_hdl, &dirent);
-        DPL_CHECK_ERR(dpl_readdir, rc, dirent.name);
+        while (DPL_SUCCESS == dpl_readdir(dir_hdl, &dirent)) {
+                if (0 != fill(data, dirent.name, NULL, 0))
+                        break;
+        }
 
         dpl_closedir(dir_hdl);
 
