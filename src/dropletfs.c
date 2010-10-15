@@ -15,20 +15,29 @@ FILE *fp;
 static mode_t root_mode = 0;
 static int debug = 0;
 
-#define LOG(fmt, ...) do {                                              \
-        if (debug)                                                      \
-                fprintf(fp, "%s:%s():%d -- " fmt "\n",                  \
-                        __FILE__, __func__, __LINE__, ##__VA_ARGS__);   \
-} while (/*CONSTCOND*/0)
+#define LOG(fmt, ...)                                                   \
+        do {                                                            \
+                if (! debug) break;                                     \
+                time_t t = time(NULL);                                  \
+                char buf[256] = "";                                     \
+                strftime(buf, sizeof buf, "%T", gmtime(&t));            \
+                fprintf(fp, "%s %s:%s():%d -- " fmt "\n",               \
+                        buf, __FILE__, __func__, __LINE__, ##__VA_ARGS__); \
+        } while (/*CONSTCOND*/0)
 
-#define DPL_CHECK_ERR(func, rc, path) do {                              \
-        if (DPL_SUCCESS != rc) {                                        \
-                fprintf(fp, "%d - "#func " %s: %s\n",                   \
-                        (int)time(NULL), path, dpl_status_str(rc));     \
+#define DPL_CHECK_ERR(func, rc, path)                                   \
+        do {                                                            \
+                if (DPL_SUCCESS == rc) break;                           \
+                LOG("%s - %s", path, dpl_status_str(rc));               \
                 return -1;                                              \
-        }                                                               \
-} while(/*CONSTCOND*/0)
+        } while(/*CONSTCOND*/0)
 
+
+static char *
+dfs_ftypetostr(dpl_ftype_t type)
+{
+        return DPL_FTYPE_REG == type ? "regular file" : "directory";
+}
 
 int
 dfs_getattr(const char *path,
