@@ -41,6 +41,15 @@ dfs_ftypetostr(dpl_ftype_t type)
         return DPL_FTYPE_REG == type ? "regular file" : "directory";
 }
 
+static void
+display_attribute(dpl_var_t *var,
+                  void *cb_arg)
+{
+        LOG("attribute for object %s: %s=%s",
+            (char *)cb_arg, var->key, var->value);
+}
+
+
 int
 dfs_getattr(const char *path,
             struct stat *buf)
@@ -70,29 +79,33 @@ dfs_getattr(const char *path,
         dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                                     ino, &parent_ino, &obj_ino, &type);
 
-        LOG("dpl_namei returned %s (%d), type = %s",
-            dpl_status_str(rc), rc, dfs_ftypetostr(type));
+        LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
+            dpl_status_str(rc), rc, dfs_ftypetostr(type),
+            parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc)
                 goto err;
 
         switch (type) {
         case DPL_FTYPE_DIR:
-                buf->st_mode = S_IFDIR;
+                buf->st_mode |= S_IFDIR;
                 break;
         case DPL_FTYPE_REG:
-                buf->st_mode = S_IFREG;
+                buf->st_mode |= S_IFREG;
                 break;
         }
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
-        if (DPL_SUCCESS != rc)
-                LOG("dpl_getattr %s: %s\n", path, dpl_status_str(rc));
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_getattr %s: %s", path, dpl_status_str(rc));
+                if (DPL_EISDIR == rc) rc = DPL_SUCCESS;
+        }
 
   err:
-
-        if (metadata)
+        if (metadata) {
+                dpl_dict_iterate(metadata, display_attribute, obj_ino.key);
                 free(metadata);
+        }
 
         return rc;
 }
