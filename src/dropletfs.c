@@ -115,7 +115,7 @@ int
 dfs_mkdir(const char *path,
           mode_t mode)
 {
-        LOG("path=%s, mode=%d", path, (int)mode);
+        LOG("path=%s, mode=%o", path, (int)mode);
 
         dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_mkdir, rc, path);
