@@ -31,14 +31,20 @@ static bool debug = false;
         do {                                                            \
                 if (DPL_SUCCESS == rc) break;                           \
                 LOG("%s - %s", path, dpl_status_str(rc));               \
-                return -1;                                              \
+                return rc;                                              \
         } while(/*CONSTCOND*/0)
 
 
 static char *
 dfs_ftypetostr(dpl_ftype_t type)
 {
-        return DPL_FTYPE_REG == type ? "regular file" : "directory";
+        switch (type) {
+        case DPL_FTYPE_REG:
+                return "regular file";
+        case DPL_FTYPE_DIR:
+                return "directory";
+        }
+        return "unknown type";
 }
 
 static void
