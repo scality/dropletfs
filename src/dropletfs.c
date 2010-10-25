@@ -56,7 +56,7 @@ display_attribute(dpl_var_t *var,
 }
 
 
-int
+static int
 dfs_getattr(const char *path,
             struct stat *buf)
 {
@@ -76,21 +76,19 @@ dfs_getattr(const char *path,
 
 	if (strcmp(path, "/") == 0) {
 		buf->st_mode = root_mode | S_IFDIR;
-                return 0;
+                return DPL_SUCCESS;
 	}
 
         dpl_ftype_t type;
         dpl_ino_t ino, parent_ino, obj_ino;
 
+        ino = dpl_cwd(ctx, ctx->cur_bucket);
         dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                                     ino, &parent_ino, &obj_ino, &type);
 
         LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
             dpl_status_str(rc), rc, dfs_ftypetostr(type),
             parent_ino.key, obj_ino.key);
-
-        if (DPL_SUCCESS != rc)
-                goto err;
 
         switch (type) {
         case DPL_FTYPE_DIR:
@@ -100,6 +98,9 @@ dfs_getattr(const char *path,
                 buf->st_mode |= S_IFREG;
                 break;
         }
+
+        if (DPL_SUCCESS != rc)
+                goto err;
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
         if (DPL_SUCCESS != rc) {
@@ -116,8 +117,7 @@ dfs_getattr(const char *path,
         return rc;
 }
 
-
-int
+static int
 dfs_mkdir(const char *path,
           mode_t mode)
 {
@@ -126,10 +126,10 @@ dfs_mkdir(const char *path,
         dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_mkdir, rc, path);
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
-int
+static int
 dfs_rmdir(const char *path)
 {
         LOG("path=%s", path);
@@ -137,10 +137,10 @@ dfs_rmdir(const char *path)
         dpl_status_t rc = dpl_rmdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_rmdir, rc, path);
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
-int
+static int
 dfs_unlink(const char *path)
 {
         LOG("path=%s", path);
@@ -148,10 +148,102 @@ dfs_unlink(const char *path)
         dpl_status_t rc = dpl_unlink(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_unlink, rc, path);
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
-int
+static int
+write_all(int fd,
+          char *buf,
+          int len)
+{
+        LOG("fd=%d, len=%d", fd, len);
+
+	ssize_t cc;
+	int remain;
+
+	remain = len;
+	while (/*CONSTCOND*/ 1)	{
+again:
+		cc = write(fd, buf, remain);
+		if (-1 == cc) {
+			if (EINTR == errno)
+				goto again;
+			return -1;
+		}
+
+		remain -= cc;
+		buf += cc;
+
+		if (! remain)
+			return 0;
+	}
+}
+
+
+static int
+cb_get_buffered(void *cb_arg,
+		char *buf,
+		unsigned len)
+{
+        LOG("len=%d", len);
+
+	struct get_data *fdata = cb_arg;
+	dpl_status_t rc;
+
+	if (fdata->fp) {
+		size_t s;
+
+		s = fwrite(buf, 1, len, fdata->fp);
+		if (s != len) {
+			LOG("fwrite: %s", strerror(errno));
+			return DPL_FAILURE;
+		}
+	} else {
+		rc = write_all(fdata->fd, buf, len);
+		if (DPL_SUCCESS != rc) {
+			rc = DPL_FAILURE;
+			goto end;
+		}
+	}
+
+	rc = DPL_SUCCESS;
+end:
+
+	return rc;
+}
+
+
+static int
+dfs_read(const char *path,
+         char *buf,
+         size_t size,
+         off_t offset,
+         struct fuse_file_info *info)
+{
+        LOG("%s - try to read %zu bytes from offset %lu",
+            path, size, (unsigned long)offset);
+
+        struct get_data *fdata = (struct get_data *)info->fh;
+	dpl_dict_t *metadata = NULL;
+	dpl_status_t rc = dpl_openread(ctx,
+                                       (char *)path,
+                                       0u,
+                                       NULL,
+                                       cb_get_buffered,
+                                       fdata,
+                                       &metadata);
+
+        DPL_CHECK_ERR(dpl_openread, rc, path);
+
+        if (metadata) {
+                dpl_dict_iterate(metadata, display_attribute, (void *)path);
+                free(metadata);
+        }
+
+        return DPL_SUCCESS;
+}
+
+static int
 dfs_write(const char *path,
           const char *buf,
           size_t size,
@@ -161,23 +253,40 @@ dfs_write(const char *path,
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, info=%p",
             path, (void *)buf, size, (long long)offset, (void *)info);
 
-        /* missing parameters */
-        dpl_status_t rc = dpl_write(NULL, (char *)buf, size);
+        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
+	dpl_dict_t *metadata = NULL;
+        dpl_vfile_t *vfile = NULL;
+        dpl_status_t rc = dpl_openwrite(ctx,
+                                        (char *)path,
+                                        DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
+                                        metadata,
+                                        canned_acl,
+                                        size,
+                                        &vfile);
+        DPL_CHECK_ERR(dpl_openwrite, rc, path);
+
+        if (metadata) {
+                dpl_dict_iterate(metadata, display_attribute, (void *)path);
+                free(metadata);
+        }
+
+        rc = dpl_write(vfile, (char *)buf, size);
         DPL_CHECK_ERR(dpl_write, rc, path);
 
-        return 0;
+        return size;
 }
 
-static int fuse_filler(void *buf,
-                       const char *name,
-                       const struct stat *stbuf,
-                       off_t off)
+static int
+fuse_filler(void *buf,
+            const char *name,
+            const struct stat *stbuf,
+            off_t off)
 {
-        return 0;
+        return DPL_SUCCESS;
 }
 
 
-int
+static int
 dfs_readdir(const char *path,
             void *data,
             fuse_fill_dir_t fill,
@@ -203,11 +312,11 @@ dfs_readdir(const char *path,
 
         dpl_closedir(dir_hdl);
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
 
-int
+static int
 dfs_opendir(const char *path,
             struct fuse_file_info *info)
 {
@@ -217,11 +326,11 @@ dfs_opendir(const char *path,
         dpl_status_t rc = dpl_opendir(ctx, (char *)path, &dir_hdl);
         DPL_CHECK_ERR(dpl_opendir, rc, path);
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
 
-int
+static int
 dfs_statfs(const char *path, struct statvfs *buf)
 {
         LOG("path=%s, buf=%p", path, (void *)buf);
@@ -234,7 +343,7 @@ dfs_statfs(const char *path, struct statvfs *buf)
                 1000ULL * 1024 / buf->f_frsize;
         buf->f_files = buf->f_ffree = 1000000000;
 
-        return 0;
+        return DPL_SUCCESS;
 }
 
 
