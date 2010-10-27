@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +7,7 @@
 #include <time.h>
 #include <assert.h>
 #include <sys/statvfs.h>
+#include <libgen.h> /* dirmame() */
 
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
@@ -16,6 +18,12 @@ dpl_ctx_t *ctx;
 FILE *fp;
 static mode_t root_mode = 0;
 static bool debug = false;
+
+
+struct get_data {
+        int fd;
+        FILE *fp;
+};
 
 #define LOG(fmt, ...)                                                   \
         do {                                                            \
@@ -49,10 +57,10 @@ dfs_ftypetostr(dpl_ftype_t type)
 
 static void
 display_attribute(dpl_var_t *var,
-                  void *cb_arg)
+                  void *arg)
 {
         LOG("attribute for object %s: %s=%s",
-            (char *)cb_arg, var->key, var->value);
+            (char *)arg, var->key, var->value);
 }
 
 
@@ -180,36 +188,36 @@ again:
 }
 
 
-static int
-cb_get_buffered(void *cb_arg,
-		char *buf,
-		unsigned len)
+
+static dpl_status_t
+cb_get_buffered(void *arg,
+                char *buf,
+                unsigned len)
 {
-        LOG("len=%d", len);
+        struct get_data *get_data = (struct get_data *)arg;
+        dpl_status_t ret = DPL_SUCCESS;
 
-	struct get_data *fdata = cb_arg;
-	dpl_status_t rc;
+        if (NULL != get_data->fp) {
+                size_t s;
 
-	if (fdata->fp) {
-		size_t s;
+                s = fwrite(buf, 1, len, get_data->fp);
+                if (s != len) {
+                        perror("fwrite");
+                        return DPL_FAILURE;
+                }
+        }
+        else {
+                ret = write_all(get_data->fd, buf, len);
+                if (DPL_SUCCESS != ret) {
+                        ret = DPL_FAILURE;
+                        goto end;
+                }
+        }
 
-		s = fwrite(buf, 1, len, fdata->fp);
-		if (s != len) {
-			LOG("fwrite: %s", strerror(errno));
-			return DPL_FAILURE;
-		}
-	} else {
-		rc = write_all(fdata->fd, buf, len);
-		if (DPL_SUCCESS != rc) {
-			rc = DPL_FAILURE;
-			goto end;
-		}
-	}
-
-	rc = DPL_SUCCESS;
+        ret = DPL_SUCCESS;
 end:
 
-	return rc;
+        return ret;
 }
 
 
@@ -223,14 +231,14 @@ dfs_read(const char *path,
         LOG("%s - try to read %zu bytes from offset %lu",
             path, size, (unsigned long)offset);
 
-        struct get_data *fdata = (struct get_data *)info->fh;
+        int fd = (int)info->fh;
 	dpl_dict_t *metadata = NULL;
 	dpl_status_t rc = dpl_openread(ctx,
                                        (char *)path,
                                        0u,
                                        NULL,
                                        cb_get_buffered,
-                                       fdata,
+                                       &fd,
                                        &metadata);
 
         DPL_CHECK_ERR(dpl_openread, rc, path);
@@ -346,22 +354,384 @@ dfs_statfs(const char *path, struct statvfs *buf)
         return DPL_SUCCESS;
 }
 
+static int
+dfs_release(const char *path,
+            struct fuse_file_info *info)
+{
+        int fd = *(int *)&info->fh;
+        LOG("%s, fd = %d", path, fd);
+
+        if (-1 != fd) {
+                if (-1 == close(fd)) {
+                        LOG("%s - %s", path, strerror(errno));
+                        return DPL_EIO;
+                }
+        }
+
+        return DPL_SUCCESS;
+}
 
 
-int dfs_mknod(const char *path, mode_t mode) { return 0; }
-int dfs_readlink(const char *path, char *buf, size_t bufsiz) { return 0; }
-int dfs_symlink(const char *oldpath, const char *newpath) { return 0; }
-int dfs_rename(const char *oldpath, const char *newpath) { return 0; }
-int dfs_chmod(const char *path, mode_t mode) { return 0; }
-int dfs_chown(const char *path, uid_t uid, gid_t gid) { return 0; }
-int dfs_truncate(const char *path, off_t offset) { return 0; }
-int dfs_utime(const char *path, struct utimbuf *times) { return 0; }
-int dfs_open(const char *path, struct fuse_file_info *info) { return 0; }
-int dfs_flush(const char *path, struct fuse_file_info *info) { return 0; }
-int dfs_fsync(const char *path, int issync, struct fuse_file_info *info) { return 0; }
-int dfs_release(const char *path, struct fuse_file_info *info) { return 0; }
-int dfs_read(const char *path, char *buf, size_t siwe, off_t offset, struct fuse_file_info *info) { return 0; }
 
+
+/* return the fd of a local copy, to operate on */
+static int
+dfs_get_local_copy(dpl_ctx_t *ctx,
+                   const char *remote)
+{
+        char local[256] = "";
+        dpl_dict_t *metadata = NULL;
+        struct get_data get_data;
+        get_data.fd = -1;
+        get_data.fp = NULL;
+
+        snprintf(local, sizeof local, "/tmp/%s/%s", ctx->cur_bucket, remote);
+
+        LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
+
+        char *tmp_local = strdup(local);
+        char *dir = dirname(tmp_local);
+        if (-1 == mkdir(dir, 0755) && (EEXIST != errno))
+                LOG("%s: %s (%d)", dir, strerror(errno), errno);
+
+        free(tmp_local);
+
+        /* a cache file already exist, remove it */
+        if (0 == access(local, F_OK)) unlink(local);
+
+        get_data.fp = fopen(local, "w");
+        if (NULL == get_data.fp) {
+                LOG("%s -> %s -- %s (%d)",
+                    remote, local, strerror(errno), errno);
+                return DPL_EIO;
+        }
+
+        get_data.fd = fileno(get_data.fp);
+        dpl_status_t rc = dpl_openread(ctx,
+                                       (char *)remote,
+                                       0u,
+                                       NULL,
+                                       cb_get_buffered,
+                                       &get_data,
+                                       &metadata);
+        if (DPL_SUCCESS != rc)
+                LOG("status: %s (%d)\n", dpl_status_str(rc), rc);
+
+err:
+        fclose(get_data.fp);
+
+        if (metadata) {
+                dpl_dict_iterate(metadata, display_attribute, (void *)remote);
+                free(metadata);
+        }
+
+        return get_data.fd;
+}
+
+
+/*
+ * TODO Need to download the file, then operate on it, and fill info->fh
+ * with the result of open() or an entry to any local cache...
+ */
+static int
+dfs_open(const char *path,
+         struct fuse_file_info *info)
+{
+        LOG("%s", path);
+
+        int fd = dfs_get_local_copy(ctx, path);
+
+        if (-1 == fd) goto err;
+
+        info->fh = fd;
+        info->flags = O_RDWR;
+
+err:
+        LOG("open fd = %d, flags=%o", fd, info->flags);
+        return fd;
+}
+
+static int
+dfs_fsync(const char *path,
+          int issync,
+          struct fuse_file_info *info)
+{
+        LOG("%s", path);
+
+        int fd = *(int *)&info->fh;
+        if (! issync && -1 == fsync(fd)) {
+                LOG("%s - %s", path, strerror(errno));
+                return DPL_EIO;
+        }
+
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_setxattr(const char *path,
+             const char *name,
+             const char *value,
+             size_t size,
+             int flag)
+{
+        LOG("path=%s, name=%s, value=%s, size=%zu, flag=%d",
+            path, name, value, size, flag);
+
+        dpl_dict_t *metadata = NULL;
+
+        dpl_status_t rc = dpl_dict_add(metadata, (char *)name, (char *)value, 0);
+        DPL_CHECK_ERR(dpl_dict_add, rc, path);
+
+        rc = dpl_setattr(ctx, (char *)path, metadata);
+        DPL_CHECK_ERR(dpl_setattr, rc, path);
+
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_create(const char *path,
+           mode_t mode,
+           struct fuse_file_info *info)
+{
+        LOG("%s", path);
+
+        dpl_ftype_t type;
+        dpl_ino_t ino, obj, parent;
+
+        ino = dpl_cwd(ctx, ctx->cur_bucket);
+        dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
+                                    ino, &parent, &obj, &type);
+
+        LOG("path=%s, ino=%s, parent=%s, obj=%s, type=%s, rc=%s (%d)",
+            path, ino.key, parent.key, obj.key, dfs_ftypetostr(type),
+            dpl_status_str(rc), rc);
+        if (DPL_ENOENT != rc) {
+                LOG("dpl_namei: %s (%d)", dpl_status_str(rc), rc);
+                return rc;
+        }
+
+        /* OK, is it a regular file? */
+        switch (DPL_FTYPE_REG != type) {
+                LOG("Unsupported filetype %s (%d)", dfs_ftypetostr(type), type);
+                return DPL_EIO;
+        }
+
+        info->flags = mode;
+        return dfs_open(path, info);
+        /* return dfs_write(path, NULL, 0u, 0u, info); */
+}
+
+
+
+/* Not implemented yet */
+
+static int
+dfs_getxattr(const char *path,
+             const char *name,
+             char *value,
+             size_t size)
+{
+        LOG("path=%s, name=%s, value=%s, size=%zu",
+            path, name, value, size);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_listxattr(const char *path,
+              char *list,
+              size_t size)
+{
+        LOG("path=%s, list=%s, size=%zu", path, list, size);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_removexattr(const char *path,
+                const char *name)
+{
+        LOG("path=%s, name=%s", path, name);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_flush(const char *path,
+          struct fuse_file_info *info)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_mknod(const char *path,
+          mode_t mode)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_readlink(const char *path,
+             char *buf,
+             size_t bufsiz)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_symlink(const char *oldpath,
+            const char *newpath)
+{
+        LOG("%s -> %s", oldpath, newpath);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_rename(const char *oldpath,
+           const char *newpath)
+{
+        LOG("%s -> %s", oldpath, newpath);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_chmod(const char *path,
+          mode_t mode)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_chown(const char *path,
+          uid_t uid,
+          gid_t gid)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_truncate(const char *path,
+             off_t offset)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_utime(const char *path,
+          struct utimbuf *times)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_releasedir(const char *path,
+               struct fuse_file_info *info)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_fsyncdir(const char *path,
+             int datasync,
+             struct fuse_file_info *info)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static void *
+dfs_init(struct fuse_conn_info *conn)
+{
+        LOG("Entering function");
+        return NULL;
+}
+
+static void
+dfs_destroy(void *arg)
+{
+        LOG("%p", arg);
+}
+
+static int
+dfs_access(const char *path, int perm)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_ftruncate(const char *path,
+              off_t offset,
+              struct fuse_file_info *info)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_fgetattr(const char *path,
+             struct stat *buf,
+             struct fuse_file_info *info)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_lock(const char *path,
+         struct fuse_file_info *info,
+         int cmd,
+         struct flock *flock)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_utimens(const char *path,
+            const struct timespec tv[2])
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_bmap(const char *path,
+         size_t blocksize,
+         uint64_t *idx)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+#if 0
+static int
+dfs_ioctl(const char *path,
+          int cmd,
+          void *arg,
+          struct fuse_file_info *info,
+          unsigned int flags,
+          void *data)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+
+static int
+dfs_poll(const char *path,
+         struct fuse_file_info *info,
+         struct fuse_pollhandle *ph,
+         unsigned *reventsp)
+{
+        LOG("%s", path);
+        return DPL_SUCCESS;
+}
+#endif
 
 struct fuse_operations dfs_ops = {
         /* implemented */
@@ -373,8 +743,17 @@ struct fuse_operations dfs_ops = {
         .unlink     = dfs_unlink,
         .rmdir      = dfs_rmdir,
         .statfs     = dfs_statfs,
+        .read       = dfs_read,
+        .release    = dfs_release,
+        .open       = dfs_open,
+        .fsync      = dfs_fsync,
+        .setxattr   = dfs_setxattr,
+        .create     = dfs_create,
 
         /* not implemented yet */
+        .getxattr   = dfs_getxattr,
+        .listxattr  = dfs_listxattr,
+        .removexattr= dfs_removexattr,
         .readlink   = dfs_readlink,
         .symlink    = dfs_symlink,
         .rename     = dfs_rename,
@@ -382,12 +761,21 @@ struct fuse_operations dfs_ops = {
         .chown      = dfs_chown,
         .truncate   = dfs_truncate,
         .utime      = dfs_utime,
-        .open       = dfs_open,
         .flush      = dfs_flush,
-        .fsync      = dfs_fsync,
-        .release    = dfs_release,
-        .read       = dfs_read,
-
+        .setxattr   = dfs_setxattr,
+        .fsyncdir   = dfs_fsyncdir,
+        .init       = dfs_init,
+        .destroy    = dfs_destroy,
+        .access     = dfs_access,
+        .ftruncate  = dfs_ftruncate,
+        .fgetattr   = dfs_fgetattr,
+        .lock       = dfs_lock,
+        .utimens    = dfs_utimens,
+        .bmap       = dfs_bmap,
+#if 0
+        .iotcl      = dfs_ioctl,
+        .poll       = dfs_poll,
+#endif
         .getdir     = NULL, /* deprecated */
         .link       = NULL, /* no support needed */
 };
