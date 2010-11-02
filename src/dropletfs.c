@@ -119,7 +119,7 @@ dfs_getattr(const char *path,
   err:
         if (metadata) {
                 dpl_dict_iterate(metadata, display_attribute, obj_ino.key);
-                free(metadata);
+                dpl_dict_free(metadata);
         }
 
         return rc;
@@ -194,7 +194,7 @@ cb_get_buffered(void *arg,
                 char *buf,
                 unsigned len)
 {
-        struct get_data *get_data = (struct get_data *)arg;
+        struct get_data *get_data = arg;
         dpl_status_t ret = DPL_SUCCESS;
 
         if (NULL != get_data->fp) {
@@ -228,24 +228,14 @@ dfs_read(const char *path,
          off_t offset,
          struct fuse_file_info *info)
 {
-        LOG("%s - try to read %zu bytes from offset %lu",
-            path, size, (unsigned long)offset);
+        LOG("%s - try to read %zu bytes from offset %lu, from fd %"PRIu64,
+            path, size, (unsigned long)offset, info->fh);
 
-        int fd = (int)info->fh;
-	dpl_dict_t *metadata = NULL;
-	dpl_status_t rc = dpl_openread(ctx,
-                                       (char *)path,
-                                       0u,
-                                       NULL,
-                                       cb_get_buffered,
-                                       &fd,
-                                       &metadata);
-
-        DPL_CHECK_ERR(dpl_openread, rc, path);
-
-        if (metadata) {
-                dpl_dict_iterate(metadata, display_attribute, (void *)path);
-                free(metadata);
+        int ret = pread(info->fh, buf, size, offset);
+        if (-1 == ret) {
+                LOG("%s - %s (%d)", path, strerror(errno), errno);
+                close(info->fh);
+                return DPL_FAILURE;
         }
 
         return DPL_SUCCESS;
@@ -258,28 +248,11 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, info=%p",
-            path, (void *)buf, size, (long long)offset, (void *)info);
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%"PRIu64,
+            path, (void *)buf, size, (long long)offset, info->fh);
 
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-	dpl_dict_t *metadata = NULL;
-        dpl_vfile_t *vfile = NULL;
-        dpl_status_t rc = dpl_openwrite(ctx,
-                                        (char *)path,
-                                        DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                                        metadata,
-                                        canned_acl,
-                                        size,
-                                        &vfile);
-        DPL_CHECK_ERR(dpl_openwrite, rc, path);
-
-        if (metadata) {
-                dpl_dict_iterate(metadata, display_attribute, (void *)path);
-                free(metadata);
-        }
-
-        rc = dpl_write(vfile, (char *)buf, size);
-        DPL_CHECK_ERR(dpl_write, rc, path);
+        int ret = pwrite(info->fh, buf, size, offset);
+        DPL_CHECK_ERR(pwrite, ret, path);
 
         return size;
 }
@@ -348,7 +321,7 @@ dfs_statfs(const char *path, struct statvfs *buf)
         buf->f_bsize = 4096;
         buf->f_frsize = buf->f_bsize;
         buf->f_blocks = buf->f_bfree = buf->f_bavail =
-                1000ULL * 1024 / buf->f_frsize;
+                (1000ULL * 1024) / buf->f_frsize;
         buf->f_files = buf->f_ffree = 1000000000;
 
         return DPL_SUCCESS;
@@ -358,7 +331,7 @@ static int
 dfs_release(const char *path,
             struct fuse_file_info *info)
 {
-        int fd = *(int *)&info->fh;
+        int fd = info->fh;
         LOG("%s, fd = %d", path, fd);
 
         if (-1 != fd) {
@@ -390,6 +363,11 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
 
         char *tmp_local = strdup(local);
+        if (! tmp_local) {
+                LOG("strdup: %s (%d)", strerror(errno), errno);
+                return -1;
+        }
+
         char *dir = dirname(tmp_local);
         if (-1 == mkdir(dir, 0755) && (EEXIST != errno))
                 LOG("%s: %s (%d)", dir, strerror(errno), errno);
@@ -399,14 +377,12 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
         /* a cache file already exist, remove it */
         if (0 == access(local, F_OK)) unlink(local);
 
-        get_data.fp = fopen(local, "w");
-        if (NULL == get_data.fp) {
-                LOG("%s -> %s -- %s (%d)",
-                    remote, local, strerror(errno), errno);
-                return DPL_EIO;
+        get_data.fd = open(local, O_RDWR|O_CREAT, 0600);
+        if (-1 == get_data.fd) {
+                LOG("open: %s: %s (%d)", local, strerror(errno), errno);
+                return -1;
         }
 
-        get_data.fd = fileno(get_data.fp);
         dpl_status_t rc = dpl_openread(ctx,
                                        (char *)remote,
                                        0u,
@@ -418,21 +394,15 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                 LOG("status: %s (%d)\n", dpl_status_str(rc), rc);
 
 err:
-        fclose(get_data.fp);
 
         if (metadata) {
                 dpl_dict_iterate(metadata, display_attribute, (void *)remote);
-                free(metadata);
+                dpl_dict_free(metadata);
         }
 
         return get_data.fd;
 }
 
-
-/*
- * TODO Need to download the file, then operate on it, and fill info->fh
- * with the result of open() or an entry to any local cache...
- */
 static int
 dfs_open(const char *path,
          struct fuse_file_info *info)
@@ -444,11 +414,11 @@ dfs_open(const char *path,
         if (-1 == fd) goto err;
 
         info->fh = fd;
-        info->flags = O_RDWR;
+        info->flags = O_RDWR|O_CREAT;
 
 err:
         LOG("open fd = %d, flags=%o", fd, info->flags);
-        return fd;
+        return DPL_SUCCESS;
 }
 
 static int
@@ -458,8 +428,7 @@ dfs_fsync(const char *path,
 {
         LOG("%s", path);
 
-        int fd = *(int *)&info->fh;
-        if (! issync && -1 == fsync(fd)) {
+        if (! issync && -1 == fsync(info->fh)) {
                 LOG("%s - %s", path, strerror(errno));
                 return DPL_EIO;
         }
@@ -518,7 +487,6 @@ dfs_create(const char *path,
 
         info->flags = mode;
         return dfs_open(path, info);
-        /* return dfs_write(path, NULL, 0u, 0u, info); */
 }
 
 
