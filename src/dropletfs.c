@@ -129,7 +129,7 @@ static int
 dfs_mkdir(const char *path,
           mode_t mode)
 {
-        LOG("path=%s, mode=%o", path, (int)mode);
+        LOG("path=%s, mode=0x%x", path, (int)mode);
 
         dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_mkdir, rc, path);
@@ -228,17 +228,18 @@ dfs_read(const char *path,
          off_t offset,
          struct fuse_file_info *info)
 {
-        LOG("%s - try to read %zu bytes from offset %lu, from fd %"PRIu64,
-            path, size, (unsigned long)offset, info->fh);
+        LOG("path=%s, buf=%p, size=%zu, offset=%llu, fd=%"PRIu64,
+            path, (void *)buf, size, (long long)offset, info->fh);
 
         int ret = pread(info->fh, buf, size, offset);
         if (-1 == ret) {
                 LOG("%s - %s (%d)", path, strerror(errno), errno);
                 close(info->fh);
-                return DPL_FAILURE;
+                return EOF;
         }
 
-        return DPL_SUCCESS;
+        LOG("%s - successfully read %d bytes", path, ret);
+        return ret;
 }
 
 static int
@@ -254,6 +255,8 @@ dfs_write(const char *path,
         int ret = pwrite(info->fh, buf, size, offset);
         DPL_CHECK_ERR(pwrite, ret, path);
 
+
+        LOG("%s - successfully wrote %d bytes", path, ret);
         return size;
 }
 
@@ -332,7 +335,7 @@ dfs_release(const char *path,
             struct fuse_file_info *info)
 {
         int fd = info->fh;
-        LOG("%s, fd = %d", path, fd);
+        LOG("%s, fd=%d", path, fd);
 
         if (-1 != fd) {
                 if (-1 == close(fd)) {
@@ -414,10 +417,10 @@ dfs_open(const char *path,
         if (-1 == fd) goto err;
 
         info->fh = fd;
-        info->flags = O_RDWR|O_CREAT;
+        info->flags = O_RDONLY;
 
 err:
-        LOG("open fd = %d, flags=%o", fd, info->flags);
+        LOG("open fd=%d, flags=0x%X", fd, info->flags);
         return DPL_SUCCESS;
 }
 
@@ -428,7 +431,7 @@ dfs_fsync(const char *path,
 {
         LOG("%s", path);
 
-        if (! issync && -1 == fsync(info->fh)) {
+        if (! issync && -1 == fsync((int)info->fh)) {
                 LOG("%s - %s", path, strerror(errno));
                 return DPL_EIO;
         }
@@ -525,7 +528,7 @@ static int
 dfs_flush(const char *path,
           struct fuse_file_info *info)
 {
-        LOG("%s", path);
+        LOG("%s, fd=%d", path, (int)info->fh);
         return DPL_SUCCESS;
 }
 
