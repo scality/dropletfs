@@ -38,7 +38,7 @@ struct get_data {
 #define DPL_CHECK_ERR(func, rc, path)                                   \
         do {                                                            \
                 if (DPL_SUCCESS == rc) break;                           \
-                LOG("%s - %s", path, dpl_status_str(rc));               \
+                LOG("%s - %s: %s", #func, path, dpl_status_str(rc));    \
                 return rc;                                              \
         } while(/*CONSTCOND*/0)
 
@@ -84,7 +84,7 @@ dfs_getattr(const char *path,
 
 	if (strcmp(path, "/") == 0) {
 		buf->st_mode = root_mode | S_IFDIR;
-                return DPL_SUCCESS;
+                return 0;
 	}
 
         dpl_ftype_t type;
@@ -100,12 +100,15 @@ dfs_getattr(const char *path,
 
         switch (type) {
         case DPL_FTYPE_DIR:
-                buf->st_mode |= S_IFDIR;
+                buf->st_mode |= (S_IFDIR | S_IRUSR | S_IXUSR);
                 break;
         case DPL_FTYPE_REG:
-                buf->st_mode |= S_IFREG;
+                buf->st_mode |= (S_IFREG | S_IRUSR | S_IWUSR );
                 break;
         }
+
+        buf->st_uid = getuid();
+        buf->st_gid = getgid();
 
         if (DPL_SUCCESS != rc)
                 goto err;
@@ -116,8 +119,18 @@ dfs_getattr(const char *path,
                 if (DPL_EISDIR == rc) rc = DPL_SUCCESS;
         }
 
-  err:
+err:
         if (metadata) {
+                /* XXX as an example, let's assume the size-related
+                 * metadata's name is... well, "size" */
+                char *size = dpl_dict_get_value(metadata, "size");
+                char *time = dpl_dict_get_value(metadata, "time");
+                if (size)
+                        buf->st_size = strtoul(size, NULL, 10);
+                if (time) {
+                        time_t t = strtoul(time, NULL, 10);
+                        buf->st_atime = buf->st_mtime = buf->st_ctime = t;
+                }
                 dpl_dict_iterate(metadata, display_attribute, obj_ino.key);
                 dpl_dict_free(metadata);
         }
@@ -134,7 +147,7 @@ dfs_mkdir(const char *path,
         dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_mkdir, rc, path);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -145,7 +158,7 @@ dfs_rmdir(const char *path)
         dpl_status_t rc = dpl_rmdir(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_rmdir, rc, path);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -156,7 +169,7 @@ dfs_unlink(const char *path)
         dpl_status_t rc = dpl_unlink(ctx, (char *)path);
         DPL_CHECK_ERR(dpl_unlink, rc, path);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -203,18 +216,18 @@ cb_get_buffered(void *arg,
                 s = fwrite(buf, 1, len, get_data->fp);
                 if (s != len) {
                         perror("fwrite");
-                        return DPL_FAILURE;
+                        return -1;
                 }
         }
         else {
                 ret = write_all(get_data->fd, buf, len);
                 if (DPL_SUCCESS != ret) {
-                        ret = DPL_FAILURE;
+                        ret = -1;
                         goto end;
                 }
         }
 
-        ret = DPL_SUCCESS;
+        ret = 0;
 end:
 
         return ret;
@@ -234,7 +247,6 @@ dfs_read(const char *path,
         int ret = pread(info->fh, buf, size, offset);
         if (-1 == ret) {
                 LOG("%s - %s (%d)", path, strerror(errno), errno);
-                close(info->fh);
                 return EOF;
         }
 
@@ -266,7 +278,7 @@ fuse_filler(void *buf,
             const struct stat *stbuf,
             off_t off)
 {
-        return DPL_SUCCESS;
+        return 0;
 }
 
 
@@ -296,7 +308,7 @@ dfs_readdir(const char *path,
 
         dpl_closedir(dir_hdl);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 
@@ -310,7 +322,7 @@ dfs_opendir(const char *path,
         dpl_status_t rc = dpl_opendir(ctx, (char *)path, &dir_hdl);
         DPL_CHECK_ERR(dpl_opendir, rc, path);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 
@@ -327,7 +339,7 @@ dfs_statfs(const char *path, struct statvfs *buf)
                 (1000ULL * 1024) / buf->f_frsize;
         buf->f_files = buf->f_ffree = 1000000000;
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -337,14 +349,10 @@ dfs_release(const char *path,
         int fd = info->fh;
         LOG("%s, fd=%d", path, fd);
 
-        if (-1 != fd) {
-                if (-1 == close(fd)) {
-                        LOG("%s - %s", path, strerror(errno));
-                        return DPL_EIO;
-                }
-        }
+        if (-1 != fd)
+                close(fd);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 
@@ -403,6 +411,7 @@ err:
                 dpl_dict_free(metadata);
         }
 
+        fsync(get_data.fd);
         return get_data.fd;
 }
 
@@ -414,14 +423,13 @@ dfs_open(const char *path,
 
         int fd = dfs_get_local_copy(ctx, path);
 
-        if (-1 == fd) goto err;
+        if (-1 == fd)
+                goto err;
 
         info->fh = fd;
-        info->flags = O_RDONLY;
-
 err:
         LOG("open fd=%d, flags=0x%X", fd, info->flags);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -433,10 +441,10 @@ dfs_fsync(const char *path,
 
         if (! issync && -1 == fsync((int)info->fh)) {
                 LOG("%s - %s", path, strerror(errno));
-                return DPL_EIO;
+                return EIO;
         }
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -457,7 +465,7 @@ dfs_setxattr(const char *path,
         rc = dpl_setattr(ctx, (char *)path, metadata);
         DPL_CHECK_ERR(dpl_setattr, rc, path);
 
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -479,16 +487,15 @@ dfs_create(const char *path,
             dpl_status_str(rc), rc);
         if (DPL_ENOENT != rc) {
                 LOG("dpl_namei: %s (%d)", dpl_status_str(rc), rc);
-                return rc;
+                return -1;
         }
 
         /* OK, is it a regular file? */
         switch (DPL_FTYPE_REG != type) {
                 LOG("Unsupported filetype %s (%d)", dfs_ftypetostr(type), type);
-                return DPL_EIO;
+                return EIO;
         }
 
-        info->flags = mode;
         return dfs_open(path, info);
 }
 
@@ -504,7 +511,7 @@ dfs_getxattr(const char *path,
 {
         LOG("path=%s, name=%s, value=%s, size=%zu",
             path, name, value, size);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -513,7 +520,7 @@ dfs_listxattr(const char *path,
               size_t size)
 {
         LOG("path=%s, list=%s, size=%zu", path, list, size);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -521,7 +528,7 @@ dfs_removexattr(const char *path,
                 const char *name)
 {
         LOG("path=%s, name=%s", path, name);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -529,7 +536,7 @@ dfs_flush(const char *path,
           struct fuse_file_info *info)
 {
         LOG("%s, fd=%d", path, (int)info->fh);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -537,7 +544,7 @@ dfs_mknod(const char *path,
           mode_t mode)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -546,7 +553,7 @@ dfs_readlink(const char *path,
              size_t bufsiz)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -554,7 +561,7 @@ dfs_symlink(const char *oldpath,
             const char *newpath)
 {
         LOG("%s -> %s", oldpath, newpath);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -562,7 +569,7 @@ dfs_rename(const char *oldpath,
            const char *newpath)
 {
         LOG("%s -> %s", oldpath, newpath);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -570,7 +577,7 @@ dfs_chmod(const char *path,
           mode_t mode)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -579,7 +586,7 @@ dfs_chown(const char *path,
           gid_t gid)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -587,7 +594,7 @@ dfs_truncate(const char *path,
              off_t offset)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -595,7 +602,7 @@ dfs_utime(const char *path,
           struct utimbuf *times)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -603,7 +610,7 @@ dfs_releasedir(const char *path,
                struct fuse_file_info *info)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -612,7 +619,7 @@ dfs_fsyncdir(const char *path,
              struct fuse_file_info *info)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static void *
@@ -632,7 +639,7 @@ static int
 dfs_access(const char *path, int perm)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -641,7 +648,7 @@ dfs_ftruncate(const char *path,
               struct fuse_file_info *info)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -650,7 +657,7 @@ dfs_fgetattr(const char *path,
              struct fuse_file_info *info)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -660,7 +667,7 @@ dfs_lock(const char *path,
          struct flock *flock)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -668,7 +675,7 @@ dfs_utimens(const char *path,
             const struct timespec tv[2])
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -677,7 +684,7 @@ dfs_bmap(const char *path,
          uint64_t *idx)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 #if 0
@@ -690,7 +697,7 @@ dfs_ioctl(const char *path,
           void *data)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 
 static int
@@ -700,7 +707,7 @@ dfs_poll(const char *path,
          unsigned *reventsp)
 {
         LOG("%s", path);
-        return DPL_SUCCESS;
+        return 0;
 }
 #endif
 
@@ -801,6 +808,7 @@ usage(const char * const prog)
         printf("Usage: %s <bucket> <mount point>\n", prog);
 }
 
+
 int
 main(int argc, char **argv)
 {
@@ -835,9 +843,8 @@ main(int argc, char **argv)
 	}
 
 	ctx = dpl_ctx_new(NULL, NULL);
-	if (! ctx) {
+	if (! ctx)
                 goto err2;
-	}
 
         ctx->trace_level = ~0;
         ctx->cur_bucket = strdup(bucket);
