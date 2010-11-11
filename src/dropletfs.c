@@ -13,6 +13,11 @@
 #include <fuse.h>
 #include <droplet.h>
 
+#define _STRIZE(arg) #arg
+#define STRIZE(x)  _STRIZE(x)
+
+#define NB_ELEM(a) ((sizeof a) / (sizeof a[0]))
+
 
 dpl_ctx_t *ctx;
 FILE *fp;
@@ -21,9 +26,12 @@ static bool debug = false;
 
 
 struct get_data {
+        struct buf *buf;
         int fd;
         FILE *fp;
 };
+
+
 
 #define LOG(fmt, ...)                                                   \
         do {                                                            \
@@ -42,6 +50,86 @@ struct get_data {
                 return rc;                                              \
         } while(/*CONSTCOND*/0)
 
+
+struct meta {
+        size_t offset;
+        size_t size;
+        char *name;
+} meta_map[] = {
+        { offsetof(struct stat, st_mode),  sizeof(mode_t), "mode"  },
+        { offsetof(struct stat, st_size),  sizeof(off_t),  "size"  },
+        { offsetof(struct stat, st_atime), sizeof(time_t), "atime" },
+        { offsetof(struct stat, st_ctime), sizeof(time_t), "ctime" },
+        { offsetof(struct stat, st_mtime), sizeof(time_t), "mtime" },
+        { offsetof(struct stat, st_uid),   sizeof(uid_t),  "uid"   },
+        { offsetof(struct stat, st_gid),   sizeof(gid_t),  "gid"   },
+};
+
+
+typedef void (*metadata_apply_t)(dpl_dict_t *, const char *, void *, size_t);
+
+static void
+metadata_foreach(metadata_apply_t cb,
+                 dpl_dict_t *dict,
+                 struct stat *st)
+{
+        int i;
+
+        for (i = 0; i < NB_ELEM(meta_map); i++) {
+                struct meta m = meta_map[i];
+                cb(dict, m.name, ((char *)st) + m.offset, m.size);
+        }
+}
+
+static void
+add_one_metadata_from_val(dpl_dict_t *dict,
+                          const char *meta,
+                          void *value)
+{
+        unsigned long v = *(unsigned long *)value;
+        char buf[512] = "";
+        snprintf(buf, sizeof buf, "%lu", v);
+        dpl_dict_add(dict, (char *)meta, buf, 0);
+}
+
+static void
+fill_stat_from_one_metadata(dpl_dict_t *dict,
+                            const char *meta,
+                            void *value)
+{
+        unsigned long *field = value;
+        char *v = dpl_dict_get_value(dict, (char *)meta);
+        if (v)
+                *field = strtoul(v, NULL, 10);
+}
+
+
+static void
+fill_metadata_from_stat(dpl_dict_t *dict,
+                        struct stat *st)
+{
+        add_one_metadata_from_val(dict, "mode", &st->st_mode);
+        add_one_metadata_from_val(dict, "size", &st->st_size);
+        add_one_metadata_from_val(dict, "atime", &st->st_atime);
+        add_one_metadata_from_val(dict, "mtime", &st->st_mtime);
+        add_one_metadata_from_val(dict, "ctime", &st->st_ctime);
+        add_one_metadata_from_val(dict, "uid", &st->st_uid);
+        add_one_metadata_from_val(dict, "gid", &st->st_gid);
+}
+
+/* FIXME we break the strict aliasing rule here */
+static void
+fill_stat_from_metadata(struct stat *st,
+                        dpl_dict_t *dict)
+{
+        fill_stat_from_one_metadata(dict, "mode", &st->st_mode);
+        fill_stat_from_one_metadata(dict, "size", &st->st_size);
+        fill_stat_from_one_metadata(dict, "atime", &st->st_atime);
+        fill_stat_from_one_metadata(dict, "mtime", &st->st_mtime);
+        fill_stat_from_one_metadata(dict, "ctime", &st->st_ctime);
+        fill_stat_from_one_metadata(dict, "uid", &st->st_uid);
+        fill_stat_from_one_metadata(dict, "gid", &st->st_gid);
+}
 
 static char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -64,14 +152,35 @@ display_attribute(dpl_var_t *var,
 }
 
 
+static void
+set_default_stat(struct stat *st, dpl_ftype_t type)
+{
+        /* default modes, if no corresponding metadata is found */
+        switch (type) {
+        case DPL_FTYPE_DIR:
+                st->st_mode |= (S_IFDIR | S_IRUSR | S_IXUSR);
+                break;
+        case DPL_FTYPE_REG:
+                st->st_mode |= (S_IFREG | S_IRUSR | S_IWUSR );
+                break;
+        }
+
+        st->st_uid = getuid();
+        st->st_gid = getgid();
+
+        st->st_atime = st->st_mtime = st->st_ctime = time(NULL);
+        st->st_size = 0;
+}
+
+
 static int
 dfs_getattr(const char *path,
-            struct stat *buf)
+            struct stat *st)
 {
-        LOG("path=%s, buf=%p", path, (void *)buf);
+        LOG("path=%s, st=%p", path, (void *)st);
 
-        assert(buf);
-        memset(buf, 0, sizeof *buf);
+        assert(st);
+        memset(st, 0, sizeof *st);
 
         dpl_dict_t *metadata = NULL;
 
@@ -80,10 +189,10 @@ dfs_getattr(const char *path,
          * see http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FAQ
          * Section 3.3.5 "Why doesn't find work on my filesystem?"
          */
-        buf->st_nlink = 1;
+        st->st_nlink = 1;
 
 	if (strcmp(path, "/") == 0) {
-		buf->st_mode = root_mode | S_IFDIR;
+		st->st_mode = root_mode | S_IFDIR;
                 return 0;
 	}
 
@@ -94,21 +203,11 @@ dfs_getattr(const char *path,
         dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                                     ino, &parent_ino, &obj_ino, &type);
 
+        set_default_stat(st, type);
+
         LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
             dpl_status_str(rc), rc, dfs_ftypetostr(type),
             parent_ino.key, obj_ino.key);
-
-        switch (type) {
-        case DPL_FTYPE_DIR:
-                buf->st_mode |= (S_IFDIR | S_IRUSR | S_IXUSR);
-                break;
-        case DPL_FTYPE_REG:
-                buf->st_mode |= (S_IFREG | S_IRUSR | S_IWUSR );
-                break;
-        }
-
-        buf->st_uid = getuid();
-        buf->st_gid = getgid();
 
         if (DPL_SUCCESS != rc)
                 goto err;
@@ -118,19 +217,11 @@ dfs_getattr(const char *path,
                 LOG("dpl_getattr %s: %s", path, dpl_status_str(rc));
                 if (DPL_EISDIR == rc) rc = DPL_SUCCESS;
         }
-
 err:
         if (metadata) {
                 /* XXX as an example, let's assume the size-related
                  * metadata's name is... well, "size" */
-                char *size = dpl_dict_get_value(metadata, "size");
-                char *time = dpl_dict_get_value(metadata, "time");
-                if (size)
-                        buf->st_size = strtoul(size, NULL, 10);
-                if (time) {
-                        time_t t = strtoul(time, NULL, 10);
-                        buf->st_atime = buf->st_mtime = buf->st_ctime = t;
-                }
+                fill_stat_from_metadata(st, metadata);
                 dpl_dict_iterate(metadata, display_attribute, obj_ino.key);
                 dpl_dict_free(metadata);
         }
@@ -200,6 +291,34 @@ again:
 	}
 }
 
+static int
+read_all(int fd,
+         char *buf,
+         dpl_vfile_t *vfile)
+{
+        dpl_status_t ret = DPL_FAILURE;
+        static int blksize = 4096;
+
+        while (1)
+        {
+                int r = read(fd, buf, blksize);
+                if (-1 == r) {
+                        LOG("read - %s", strerror(errno));
+                        return -1;
+                }
+
+                if (0 == r)
+                        break;
+
+                ret = dpl_write(vfile, buf, r);
+                if (DPL_SUCCESS != ret) {
+                        LOG("dpl_write: %s (%d)", dpl_status_str(ret), ret);
+                        return -1;
+                }
+        }
+
+        return 0;
+}
 
 
 static dpl_status_t
@@ -356,6 +475,57 @@ dfs_release(const char *path,
 }
 
 
+static int
+dfs_put_local_copy(dpl_ctx_t *ctx,
+                   const char *path)
+{
+        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
+        dpl_dict_t *metadata = NULL;
+        dpl_vfile_t *vfile = NULL;
+        dpl_status_t ret = DPL_FAILURE;
+        int fd = open(path, O_RDONLY);
+        if (-1 == fd) {
+                LOG("open: %s", strerror(errno));
+                return -1;
+        }
+
+        struct stat st;
+        if (-1 == fstat(fd, &st)) {
+                LOG("fstat(fd=%d): %s", fd, strerror(errno));
+                return -1;
+        }
+
+        fill_metadata_from_stat(metadata, &st);
+
+        char *remote = strrchr(path, '/');
+        if (! remote)
+                remote = (char *)path;
+        else
+                remote++;
+
+        ret = dpl_openwrite(ctx,
+                            remote,
+                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
+                            metadata,
+                            canned_acl,
+                            st.st_size,
+                            &vfile);
+
+        if (DPL_SUCCESS != ret) {
+                LOG("dpl_openwrite: %s (%d)", dpl_status_str(ret), ret);
+                goto err;
+        }
+
+err:
+        if (vfile)
+                dpl_close(vfile);
+
+        if (metadata)
+                dpl_dict_free(metadata);
+
+        return fd;
+}
+
 
 
 /* return the fd of a local copy, to operate on */
@@ -365,9 +535,7 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
 {
         char local[256] = "";
         dpl_dict_t *metadata = NULL;
-        struct get_data get_data;
-        get_data.fd = -1;
-        get_data.fp = NULL;
+        struct get_data get_data = { .fd = -1, .fp = NULL, .buf = NULL };
 
         snprintf(local, sizeof local, "/tmp/%s/%s", ctx->cur_bucket, remote);
 
@@ -401,16 +569,14 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                                        cb_get_buffered,
                                        &get_data,
                                        &metadata);
-        if (DPL_SUCCESS != rc)
-                LOG("status: %s (%d)\n", dpl_status_str(rc), rc);
-
-err:
-
-        if (metadata) {
-                dpl_dict_iterate(metadata, display_attribute, (void *)remote);
-                dpl_dict_free(metadata);
+        if (DPL_SUCCESS != rc) {
+                LOG("fd=%d, status: %s (%d)",
+                    get_data.fd, dpl_status_str(rc), rc);
+                close(get_data.fd);
+                return -1;
         }
 
+err:
         fsync(get_data.fd);
         return get_data.fd;
 }
@@ -577,6 +743,14 @@ dfs_chmod(const char *path,
           mode_t mode)
 {
         LOG("%s", path);
+
+        dpl_dict_t *metadata = NULL;
+
+        dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
+
+        if (metadata)
+                add_one_metadata_from_val(metadata, "mode", &mode);
+
         return 0;
 }
 
