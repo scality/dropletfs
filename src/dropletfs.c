@@ -115,8 +115,9 @@ static void
 fill_stat_from_metadata(struct stat *st,
                         dpl_dict_t *dict)
 {
-        STORE_META(st, dict, mode, mode_t);
+        LOG("entering function");
         STORE_META(st, dict, size, size_t);
+        STORE_META(st, dict, mode, mode_t);
         STORE_META(st, dict, uid, uid_t);
         STORE_META(st, dict, gid, gid_t);
         STORE_META(st, dict, atime, time_t);
@@ -212,10 +213,7 @@ dfs_getattr(const char *path,
         }
 err:
         if (metadata) {
-                /* XXX as an example, let's assume the size-related
-                 * metadata's name is... well, "size" */
                 fill_stat_from_metadata(st, metadata);
-                dpl_dict_iterate(metadata, display_attribute, obj_ino.key);
                 dpl_dict_free(metadata);
         }
 
@@ -353,17 +351,26 @@ dfs_read(const char *path,
          off_t offset,
          struct fuse_file_info *info)
 {
-        LOG("path=%s, buf=%p, size=%zu, offset=%llu, fd=%"PRIu64,
-            path, (void *)buf, size, (long long)offset, info->fh);
+        int fd = info->fh;
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
+            path, (void *)buf, size, (long long)offset, fd);
 
-        int ret = pread(info->fh, buf, size, offset);
-        if (-1 == ret) {
-                LOG("%s - %s (%d)", path, strerror(errno), errno);
-                return EOF;
-        }
+        struct stat st;
+        if (-1 == fstat(fd, &st))
+                goto err;
+
+        if (-1 == lseek(fd, offset, SEEK_SET))
+                goto err;
+
+        if (-1 == read(fd, buf, size))
+                goto err;
 
         LOG("%s - successfully read %d bytes", path, ret);
         return ret;
+
+  err:
+        LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
+        return -1;
 }
 
 static int
@@ -373,15 +380,26 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%"PRIu64,
-            path, (void *)buf, size, (long long)offset, info->fh);
+        int fd = info->fh;
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
+            path, (void *)buf, size, (long long)offset, fd);
 
-        int ret = pwrite(info->fh, buf, size, offset);
-        DPL_CHECK_ERR(pwrite, ret, path);
+        struct stat st;
+        if (-1 == fstat(fd, &st))
+                goto err;
 
+        if (-1 == lseek(fd, offset, SEEK_SET))
+                goto err;
+
+        if (-1 == write(fd, buf, size))
+                goto err;
 
         LOG("%s - successfully wrote %d bytes", path, ret);
-        return size;
+        return ret;
+
+  err:
+        LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
+        return -1;
 }
 
 static int
