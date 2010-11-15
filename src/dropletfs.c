@@ -351,6 +351,7 @@ dfs_read(const char *path,
          off_t offset,
          struct fuse_file_info *info)
 {
+        int ret = -1;
         int fd = info->fh;
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, fd);
@@ -362,7 +363,8 @@ dfs_read(const char *path,
         if (-1 == lseek(fd, offset, SEEK_SET))
                 goto err;
 
-        if (-1 == read(fd, buf, size))
+        ret = read(fd, buf, size);
+        if (-1 == ret)
                 goto err;
 
         LOG("%s - successfully read %d bytes", path, ret);
@@ -380,6 +382,7 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
+        int ret = -1;
         int fd = info->fh;
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, fd);
@@ -391,7 +394,8 @@ dfs_write(const char *path,
         if (-1 == lseek(fd, offset, SEEK_SET))
                 goto err;
 
-        if (-1 == write(fd, buf, size))
+        ret = write(fd, buf, size);
+        if (-1 == ret)
                 goto err;
 
         LOG("%s - successfully wrote %d bytes", path, ret);
