@@ -87,6 +87,10 @@ add_one_metadata(dpl_dict_t *dict,
                  const char *meta,
                  unsigned long value)
 {
+        dpl_var_t *var = dpl_dict_get(dict, (char *)meta);
+        if (var)
+                dpl_dict_remove(dict, var);
+
         char buf[512] = "";
         snprintf(buf, sizeof buf, "%lu", value);
         dpl_dict_add(dict, (char *)meta, buf, 0);
@@ -204,20 +208,22 @@ dfs_getattr(const char *path,
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc)
-                goto err;
+                return -1;
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
-        if (DPL_SUCCESS != rc) {
+        if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
                 LOG("dpl_getattr %s: %s", path, dpl_status_str(rc));
-                if (DPL_EISDIR == rc) rc = DPL_SUCCESS;
+                if (metadata)
+                        dpl_dict_free(metadata);
+                return -1;
         }
-err:
+
         if (metadata) {
                 fill_stat_from_metadata(st, metadata);
                 dpl_dict_free(metadata);
         }
 
-        return rc;
+        return 0;
 }
 
 static int
@@ -592,6 +598,9 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                 return -1;
         }
 
+        if (metadata)
+                dpl_dict_free(metadata);
+
 err:
         fsync(get_data.fd);
         return get_data.fd;
@@ -780,7 +789,7 @@ dfs_rename(const char *oldpath,
         if (DPL_FAILURE == rc)
                 goto failure;
 
-        return 0;
+        return dfs_unlink(oldpath);;
 
 failure:
         LOG("%s (%d)", dpl_status_str(rc), rc);
@@ -805,6 +814,9 @@ dfs_chmod(const char *path,
 
         add_one_metadata(metadata, "mode", mode);
         rc = dpl_setattr(ctx, (char *)path, metadata);
+
+        if (metadata)
+                dpl_dict_free(metadata);
 
         if (DPL_FAILURE == rc)
                 goto failure;
@@ -836,6 +848,9 @@ dfs_chown(const char *path,
         add_one_metadata(metadata, "uid", uid);
         add_one_metadata(metadata, "gid", gid);
         rc = dpl_setattr(ctx, (char *)path, metadata);
+
+        if (metadata)
+                dpl_dict_free(metadata);
 
         if (DPL_FAILURE == rc)
                 goto failure;
