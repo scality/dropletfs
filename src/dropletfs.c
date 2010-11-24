@@ -902,13 +902,12 @@ dfs_chmod(const char *path,
                 goto failure;
 
         if (! metadata)
-                return 0;
+                metadata = dpl_dict_new(13);
 
-        add_one_metadata(metadata, "mode", mode);
+        assign_meta_to_dict(metadata, "mode", &mode);
         rc = dpl_setattr(ctx, (char *)path, metadata);
 
-        if (metadata)
-                dpl_dict_free(metadata);
+        dpl_dict_free(metadata);
 
         if (DPL_FAILURE == rc)
                 goto failure;
@@ -916,7 +915,7 @@ dfs_chmod(const char *path,
         return 0;
 
 failure:
-        LOG("%s (%d)", dpl_status_str(rc), rc);
+        LOG("dpl_setattr: %s (%d)", dpl_status_str(rc), rc);
         return -1;
 }
 
