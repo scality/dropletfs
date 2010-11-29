@@ -28,7 +28,7 @@ dfs_open(const char *path,
                 }
         }
 
-        info->fh = *(uint64_t *)pentry;
+        info->fh = (uint64_t)pentry;
 
         LOG("open @pentry=%p, fd=%d, flags=0x%X",
             pentry, pentry->fd, info->flags);
