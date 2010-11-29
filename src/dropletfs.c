@@ -1,165 +1,39 @@
 #include <inttypes.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <time.h>
 #include <assert.h>
 #include <sys/statvfs.h>
-#include <libgen.h> /* dirmame() */
+#include <libgen.h>
 
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
-#include <droplet.h>
 
-#define _STRIZE(arg) #arg
-#define STRIZE(x)  _STRIZE(x)
-
-#define NB_ELEM(a) ((sizeof a) / (sizeof a[0]))
+#include "glob.h"
 
 
-dpl_ctx_t *ctx;
-FILE *fp;
-static mode_t root_mode = 0;
-static bool debug = false;
-
-
-struct get_data {
-        struct buf *buf;
-        int fd;
-        FILE *fp;
-};
-
-
-
-#define LOG(fmt, ...)                                                   \
-        do {                                                            \
-                if (! debug) break;                                     \
-                time_t t = time(NULL);                                  \
-                char buf[256] = "";                                     \
-                strftime(buf, sizeof buf, "%T", gmtime(&t));            \
-                fprintf(fp, "%s %s:%s():%d -- " fmt "\n",               \
-                        buf, __FILE__, __func__, __LINE__, ##__VA_ARGS__); \
-        } while (/*CONSTCOND*/0)
-
-#define DPL_CHECK_ERR(func, rc, path)                                   \
-        do {                                                            \
-                if (DPL_SUCCESS == rc) break;                           \
-                LOG("%s - %s: %s", #func, path, dpl_status_str(rc));    \
-                return rc;                                              \
-        } while(/*CONSTCOND*/0)
-
-
-struct meta {
-        size_t offset;
-        char *name;
-} meta_map[] = {
-        { offsetof(struct stat, st_mode),  "mode"  },
-        { offsetof(struct stat, st_size),  "size"  },
-        { offsetof(struct stat, st_atime), "atime" },
-        { offsetof(struct stat, st_ctime), "ctime" },
-        { offsetof(struct stat, st_mtime), "mtime" },
-        { offsetof(struct stat, st_uid),   "uid"   },
-        { offsetof(struct stat, st_gid),   "gid"   },
-};
+dpl_ctx_t *ctx = NULL;
+FILE *fp = NULL;
+mode_t root_mode = 0;
+int debug = 0;
+GHashTable *hash = NULL;
 
 static void
-print_flags(const char * const path,
-            struct fuse_file_info *info)
+atexit_callback(void)
 {
-        switch (info->flags & O_ACCMODE) {
-        case O_RDONLY:
-                LOG("%s: read only", path);
-                break;
-        case O_WRONLY:
-                LOG("%s: write only", path);
-                break;
-        case O_RDWR:
-                LOG("%s: read/write", path);
-                break;
-        default:
-                LOG("%s: unknown flags 0x%x", path, info->flags & O_ACCMODE);
-        }
-}
+        g_hash_table_remove_all(hash);
 
-static void
-assign_meta_to_dict(dpl_dict_t *dict,
-                    char *meta,
-                    void *v)
-{
-        unsigned long val = *(unsigned long*)v;
-        dpl_var_t *var = NULL;
-        char buf[128] = "";
-        if (NULL != (var = dpl_dict_get(dict, meta)))
-                dpl_dict_remove(dict, var);
-        snprintf(buf, sizeof buf, "%lu", val);
-        dpl_dict_add(dict, meta, buf, 0);
-}
+        if (ctx)
+                dpl_ctx_free(ctx);
 
-static void
-fill_metadata_from_stat(dpl_dict_t *dict,
-                        struct stat *st)
-{
-        assign_meta_to_dict(dict, "mode", &st->st_mode);
-        assign_meta_to_dict(dict, "size", &st->st_size);
-        assign_meta_to_dict(dict, "uid", &st->st_uid);
-        assign_meta_to_dict(dict, "gid", &st->st_gid);
-        assign_meta_to_dict(dict, "atime", &st->st_atime);
-        assign_meta_to_dict(dict, "mtime", &st->st_mtime);
-        assign_meta_to_dict(dict, "ctime", &st->st_ctime);
+	dpl_free();
+
+        if (fp)
+                fclose(fp);
 }
 
 
-static long long
-metadatatoll(dpl_dict_t *dict,
-             const char *const name)
-{
-        char *value = dpl_dict_get_value(dict, (char *)name);
-
-        if (! value)
-                return -1;
-
-        if (0 == strcmp(name, "mode"))
-                LOG("meta=%s, value=0x%x",
-                    name,
-                    (unsigned)strtoul(value, NULL, 10));
-        else
-                LOG("meta=%s, value=%s", name, value);
-        return (long long)strtoul(value, NULL, 10);
-}
-
-#define STORE_META(st, dict, name, type) do {                           \
-                long long v = metadatatoll(dict, #name);                \
-                if (-1 != v)                                            \
-                        st->st_##name = (type)v;                        \
-        } while (0 /*CONSTCOND*/)
-
-static void
-fill_stat_from_metadata(struct stat *st,
-                        dpl_dict_t *dict)
-{
-        LOG("entering function");
-        STORE_META(st, dict, size, size_t);
-        STORE_META(st, dict, mode, mode_t);
-        STORE_META(st, dict, uid, uid_t);
-        STORE_META(st, dict, gid, gid_t);
-        STORE_META(st, dict, atime, time_t);
-        STORE_META(st, dict, ctime, time_t);
-        STORE_META(st, dict, mtime, time_t);
-}
-
-static char *
-dfs_ftypetostr(dpl_ftype_t type)
-{
-        switch (type) {
-        case DPL_FTYPE_REG:
-                return "regular file";
-        case DPL_FTYPE_DIR:
-                return "directory";
-        }
-        return "unknown type";
-}
 
 static void
 display_attribute(dpl_var_t *var,
@@ -170,617 +44,6 @@ display_attribute(dpl_var_t *var,
 }
 
 
-static void
-set_default_stat(struct stat *st, dpl_ftype_t type)
-{
-        /* default modes, if no corresponding metadata is found */
-        switch (type) {
-        case DPL_FTYPE_DIR:
-                st->st_mode |= (S_IFDIR | S_IRUSR | S_IXUSR);
-                break;
-        case DPL_FTYPE_REG:
-                st->st_mode |= (S_IFREG | S_IRUSR | S_IWUSR );
-                break;
-        }
-
-        st->st_uid = getuid();
-        st->st_gid = getgid();
-
-        st->st_atime = st->st_mtime = st->st_ctime = time(NULL);
-        st->st_size = 0;
-}
-
-
-static int
-dfs_getattr(const char *path,
-            struct stat *st)
-{
-        LOG("path=%s, st=%p", path, (void *)st);
-
-        assert(st);
-        memset(st, 0, sizeof *st);
-
-        dpl_dict_t *metadata = NULL;
-
-        /*
-         * why setting st_nlink to 1?
-         * see http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FAQ
-         * Section 3.3.5 "Why doesn't find work on my filesystem?"
-         */
-        st->st_nlink = 1;
-
-	if (strcmp(path, "/") == 0) {
-		st->st_mode = root_mode | S_IFDIR;
-                return 0;
-	}
-
-        dpl_ftype_t type;
-        dpl_ino_t ino, parent_ino, obj_ino;
-
-        ino = dpl_cwd(ctx, ctx->cur_bucket);
-        dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                                    ino, &parent_ino, &obj_ino, &type);
-
-        LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
-            dpl_status_str(rc), rc, dfs_ftypetostr(type),
-            parent_ino.key, obj_ino.key);
-
-        if (DPL_SUCCESS != rc)
-                return rc;
-
-        rc = dpl_getattr(ctx, (char *)path, &metadata);
-        if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                LOG("dpl_getattr %s: %s", path, dpl_status_str(rc));
-                if (metadata)
-                        dpl_dict_free(metadata);
-                return -1;
-        }
-
-        set_default_stat(st, type);
-        if (metadata) {
-                fill_stat_from_metadata(st, metadata);
-                dpl_dict_free(metadata);
-        }
-
-        return 0;
-}
-
-static int
-dfs_mkdir(const char *path,
-          mode_t mode)
-{
-        LOG("path=%s, mode=0x%x", path, (int)mode);
-
-        dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
-        DPL_CHECK_ERR(dpl_mkdir, rc, path);
-
-        return 0;
-}
-
-static int
-dfs_rmdir(const char *path)
-{
-        LOG("path=%s", path);
-
-        dpl_status_t rc = dpl_rmdir(ctx, (char *)path);
-        DPL_CHECK_ERR(dpl_rmdir, rc, path);
-
-        return 0;
-}
-
-static int
-dfs_unlink(const char *path)
-{
-        LOG("path=%s", path);
-
-        dpl_status_t rc = dpl_unlink(ctx, (char *)path);
-        DPL_CHECK_ERR(dpl_unlink, rc, path);
-
-        return 0;
-}
-
-static int
-write_all(int fd,
-          char *buf,
-          int len)
-{
-        LOG("fd=%d, len=%d", fd, len);
-
-	ssize_t cc;
-	int remain;
-
-	remain = len;
-	while (/*CONSTCOND*/ 1)	{
-again:
-		cc = write(fd, buf, remain);
-		if (-1 == cc) {
-			if (EINTR == errno)
-				goto again;
-			return -1;
-		}
-
-		remain -= cc;
-		buf += cc;
-
-		if (! remain)
-			return 0;
-	}
-}
-
-static int
-read_all(int fd,
-         char *buf,
-         dpl_vfile_t *vfile)
-{
-        dpl_status_t ret = DPL_FAILURE;
-        static int blksize = 4096;
-
-        while (1)
-        {
-                int r = read(fd, buf, blksize);
-                if (-1 == r) {
-                        LOG("read - %s", strerror(errno));
-                        return -1;
-                }
-
-                if (0 == r)
-                        break;
-
-                ret = dpl_write(vfile, buf, r);
-                if (DPL_SUCCESS != ret) {
-                        LOG("dpl_write: %s (%d)", dpl_status_str(ret), ret);
-                        return -1;
-                }
-        }
-
-        return 0;
-}
-
-
-static dpl_status_t
-cb_get_buffered(void *arg,
-                char *buf,
-                unsigned len)
-{
-        struct get_data *get_data = arg;
-        dpl_status_t ret = DPL_SUCCESS;
-
-        if (NULL != get_data->fp) {
-                size_t s;
-
-                s = fwrite(buf, 1, len, get_data->fp);
-                if (s != len) {
-                        perror("fwrite");
-                        return -1;
-                }
-        } else {
-                ret = write_all(get_data->fd, buf, len);
-                if (DPL_SUCCESS != ret) {
-                        ret = -1;
-                        goto end;
-                }
-        }
-
-        ret = 0;
-end:
-
-        return ret;
-}
-
-
-static int
-dfs_read(const char *path,
-         char *buf,
-         size_t size,
-         off_t offset,
-         struct fuse_file_info *info)
-{
-        int ret = -1;
-        int fd = info->fh;
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
-            path, (void *)buf, size, (long long)offset, fd);
-
-        struct stat st;
-        if (-1 == fstat(fd, &st))
-                goto err;
-
-        if (-1 == lseek(fd, offset, SEEK_SET))
-                goto err;
-
-        ret = read(fd, buf, size);
-        if (-1 == ret)
-                goto err;
-
-        LOG("%s - successfully read %d bytes", path, ret);
-        return ret;
-
-  err:
-        LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
-        return -1;
-}
-
-static int
-dfs_write(const char *path,
-          const char *buf,
-          size_t size,
-          off_t offset,
-          struct fuse_file_info *info)
-{
-        int ret = -1;
-        int fd = info->fh;
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
-            path, (void *)buf, size, (long long)offset, fd);
-
-        struct stat st;
-        if (-1 == fstat(fd, &st))
-                goto err;
-
-        if (-1 == lseek(fd, offset, SEEK_SET))
-                goto err;
-
-        ret = write(fd, buf, size);
-        if (-1 == ret)
-                goto err;
-
-        LOG("%s - successfully wrote %d bytes", path, ret);
-        return ret;
-
-  err:
-        LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
-        return -1;
-}
-
-static int
-fuse_filler(void *buf,
-            const char *name,
-            const struct stat *stbuf,
-            off_t off)
-{
-        return 0;
-}
-
-
-static int
-dfs_readdir(const char *path,
-            void *data,
-            fuse_fill_dir_t fill,
-            off_t offset,
-            struct fuse_file_info *info)
-{
-        LOG("path=%s, data=%p, fill=%p, offset=%lld, info=%p",
-            path, data, (void *)fill, (long long)offset, (void *)info);
-
-        void *dir_hdl;
-        dpl_dirent_t dirent;
-
-        dpl_status_t rc = dpl_chdir(ctx, (char *)path);
-        DPL_CHECK_ERR(dpl_chdir, rc, path);
-
-        rc = dpl_opendir(ctx, ".", &dir_hdl);
-        DPL_CHECK_ERR(dpl_opendir, rc, ".");
-
-        while (DPL_SUCCESS == dpl_readdir(dir_hdl, &dirent)) {
-                if (0 != fill(data, dirent.name, NULL, 0))
-                        break;
-        }
-
-        dpl_closedir(dir_hdl);
-
-        return 0;
-}
-
-
-static int
-dfs_opendir(const char *path,
-            struct fuse_file_info *info)
-{
-        LOG("path=%s, info=%p", path, (void *)info);
-
-        void *dir_hdl;
-        dpl_status_t rc = dpl_opendir(ctx, (char *)path, (void *[]){NULL});
-        DPL_CHECK_ERR(dpl_opendir, rc, path);
-
-        return 0;
-}
-
-
-static int
-dfs_statfs(const char *path, struct statvfs *buf)
-{
-        LOG("path=%s, buf=%p", path, (void *)buf);
-
-        buf->f_flag = ST_RDONLY;
-        buf->f_namemax = 255;
-        buf->f_bsize = 4096;
-        buf->f_frsize = buf->f_bsize;
-        buf->f_blocks = buf->f_bfree = buf->f_bavail =
-                (1000ULL * 1024) / buf->f_frsize;
-        buf->f_files = buf->f_ffree = 1000000000;
-
-        return 0;
-}
-
-static int
-dfs_release(const char *path,
-            struct fuse_file_info *info)
-{
-        int fd = info->fh;
-        LOG("%s, fd=%d", path, fd);
-
-        if (-1 != fd)
-                close(fd);
-
-        return 0;
-}
-
-
-static void
-dfs_put_local_copy(dpl_ctx_t *ctx,
-                   dpl_dict_t *dict,
-                   struct fuse_file_info *info,
-                   const char *remote)
-{
-        LOG("entering... remote=%s, info->fh=%d", remote, (int)info->fh);
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-        dpl_vfile_t *vfile = NULL;
-        dpl_status_t ret = DPL_FAILURE;
-        int fd = info->fh;
-        if (-1 == fd) {
-                LOG("invalid fd (-1)");
-                return;
-        }
-
-        char *s = dpl_dict_get_value(dict, "size");
-        unsigned long size = s ? strtoul(s, NULL, 10) : 0;
-        LOG("size=%lu", size);
-
-        ret = dpl_openwrite(ctx,
-                            (char *)remote,
-                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                            dict,
-                            canned_acl,
-                            size,
-                            &vfile);
-
-        if (DPL_SUCCESS != ret) {
-                LOG("dpl_openwrite: %s (%d)", dpl_status_str(ret), ret);
-                goto err;
-        }
-
-        char *buf = malloc(size);
-        if (! buf) {
-                LOG("malloc(%ld bytes): %s (%d)",
-                    size, strerror(errno), errno);
-                goto err;
-        }
-
-        if (-1 == read_all(fd, buf, vfile))
-                goto err;
-
-  err:
-        if (buf)
-                free(buf);
-
-        if (vfile)
-                dpl_close(vfile);
-}
-
-
-
-/* return the fd of a local copy, to operate on */
-static int
-dfs_get_local_copy(dpl_ctx_t *ctx,
-                   const char *remote)
-{
-        char local[256] = "";
-        dpl_dict_t *metadata = NULL;
-        struct get_data get_data = { .fd = -1, .fp = NULL, .buf = NULL };
-
-        snprintf(local, sizeof local, "/tmp/%s/%s", ctx->cur_bucket, remote);
-
-        LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
-
-        char *tmp_local = strdup(local);
-        if (! tmp_local) {
-                LOG("strdup: %s (%d)", strerror(errno), errno);
-                return -1;
-        }
-
-        char *dir = dirname(tmp_local);
-        if (-1 == mkdir(dir, 0755) && (EEXIST != errno))
-                LOG("%s: %s (%d)", dir, strerror(errno), errno);
-
-        free(tmp_local);
-
-        /* a cache file already exist, remove it */
-        if (0 == access(local, F_OK)) unlink(local);
-
-        get_data.fd = open(local, O_RDWR|O_CREAT, 0600);
-        if (-1 == get_data.fd) {
-                LOG("open: %s: %s (%d)", local, strerror(errno), errno);
-                return -1;
-        }
-
-        dpl_status_t rc = dpl_openread(ctx,
-                                       (char *)remote,
-                                       0u,
-                                       NULL,
-                                       cb_get_buffered,
-                                       &get_data,
-                                       &metadata);
-
-        if (DPL_SUCCESS != rc) {
-                LOG("fd=%d, status: %s (%d)",
-                    get_data.fd, dpl_status_str(rc), rc);
-                close(get_data.fd);
-                return -1;
-        }
-
-        if (metadata)
-                dpl_dict_free(metadata);
-
-err:
-        fsync(get_data.fd);
-        return get_data.fd;
-}
-
-static int
-dfs_open(const char *path,
-         struct fuse_file_info *info)
-{
-        LOG("%s", path);
-
-        print_flags(path, info);
-
-        info->fh = dfs_get_local_copy(ctx, path);
-
-        LOG("open fd=%lld, flags=0x%X", info->fh, info->flags);
-        return 0;
-}
-
-static int
-dfs_fsync(const char *path,
-          int issync,
-          struct fuse_file_info *info)
-{
-        LOG("%s", path);
-
-        if (! issync && -1 == fsync((int)info->fh)) {
-                LOG("%s - %s", path, strerror(errno));
-                return EIO;
-        }
-
-        return 0;
-}
-
-static int
-dfs_setxattr(const char *path,
-             const char *name,
-             const char *value,
-             size_t size,
-             int flag)
-{
-        LOG("path=%s, name=%s, value=%s, size=%zu, flag=%d",
-            path, name, value, size, flag);
-
-        dpl_dict_t *metadata = NULL;
-
-        dpl_status_t rc = dpl_dict_add(metadata, (char *)name, (char *)value, 0);
-        DPL_CHECK_ERR(dpl_dict_add, rc, path);
-
-        rc = dpl_setattr(ctx, (char *)path, metadata);
-        DPL_CHECK_ERR(dpl_setattr, rc, path);
-
-        return 0;
-}
-
-static int
-dfs_create(const char *path,
-           mode_t mode,
-           struct fuse_file_info *info)
-{
-        LOG("%s, mode=0x%x", path, (unsigned)mode);
-
-        print_flags(path, info);
-        dpl_ftype_t type;
-        dpl_ino_t ino, obj, parent;
-        int ret = -1;
-
-        ino = dpl_cwd(ctx, ctx->cur_bucket);
-        dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                                    ino, &parent, &obj, &type);
-
-        LOG("path=%s, ino=%s, parent=%s, obj=%s, type=%s, rc=%s (%d)",
-            path, ino.key, parent.key, obj.key, dfs_ftypetostr(type),
-            dpl_status_str(rc), rc);
-        if (DPL_ENOENT != rc) {
-                /* TODO handle the following cases here:
-                 *   - we overwrite the current file
-                 *   - we do not have permissions to do so
-                 */
-                LOG("dpl_namei: %s (%d)", dpl_status_str(rc), rc);
-                return -1;
-        }
-
-        /* OK, is it a regular file? */
-        switch (DPL_FTYPE_REG != type) {
-                LOG("Unsupported filetype %s (%d)", dfs_ftypetostr(type), type);
-                return EIO;
-        }
-
-        dpl_dict_t *dict = dpl_dict_new(13);
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-        dpl_vfile_t *vfile = NULL;
-
-        char *remote = strrchr(path, '/');
-        if (! remote)
-                remote = (char *)path;
-        else
-                remote++;
-
-        info->flags = mode;
-        struct stat st;
-        if (-1 == fstat(info->fh, &st)) {
-                LOG("fstat(fd=%"PRIu64", ...) = %s (%d)",
-                    info->fh, strerror(errno), errno);
-                return -1;
-        }
-
-        /* we keep the same metadata... */
-        fill_metadata_from_stat(dict, &st);
-
-        /* except for the mode, which is explicitely passed
-         * in argument */
-        assign_meta_to_dict(dict, "mode", &mode);
-
-        LOG("info->fh=%d, remote=%s", (int)info->fh, remote);
-        dfs_put_local_copy(ctx, dict, info, remote);
-
-        rc = dpl_openwrite(ctx,
-                           (char *)path,
-                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                           dict,
-                           canned_acl,
-                           st.st_size,
-                           &vfile);
-
-        if (dict)
-                dpl_dict_free(dict);
-
-        if (DPL_SUCCESS != rc)
-                goto err;
-
-        char *buf = malloc(st.st_size);
-        if (! buf) {
-                LOG("malloc(%lld bytes): %s (%d)",
-                    st.st_size, strerror(errno), errno);
-                goto err;
-        }
-
-        if (-1 == read_all(info->fh, buf, vfile))
-                goto err;
-
-        /* if we reach this point, then everything's ok */
-        ret = info->fh;
-
-  err:
-        if (buf)
-                free(buf);
-
-        if (vfile) {
-                LOG("");
-                rc = dpl_close(vfile);
-                LOG("");
-                if (DPL_SUCCESS != rc) {
-                        LOG("dpl_close: %s (%d)", dpl_status_str(rc), rc);
-                        return -1;
-                }
-        }
-
-        LOG("exiting function, fd=%d", ret);
-
-        return ret;
-}
 
 
 
@@ -818,7 +81,7 @@ static int
 dfs_flush(const char *path,
           struct fuse_file_info *info)
 {
-        LOG("%s, fd=%d", path, (int)info->fh);
+        LOG("%s", path);
         return 0;
 }
 
@@ -845,112 +108,6 @@ dfs_symlink(const char *oldpath,
 {
         LOG("%s -> %s", oldpath, newpath);
         return 0;
-}
-
-static int
-dfs_rename(const char *oldpath,
-           const char *newpath)
-{
-        LOG("%s -> %s", oldpath, newpath);
-
-        struct get_data get_data = { .fd = -1, .buf = NULL, .fp = NULL };
-        dpl_vfile_t *vfile = NULL;
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-        dpl_dict_t *dict = NULL;
-        dpl_status_t rc = dpl_openread(ctx,
-                                       (char *)oldpath,
-                                       0u,
-                                       NULL,
-                                       cb_get_buffered,
-                                       &get_data,
-                                       &dict);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        size_t size = metadatatoll(dict, "size");
-
-        rc = dpl_openwrite(ctx,
-                           (char *)newpath,
-                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                           dict,
-                           canned_acl,
-                           size,
-                           &vfile);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        return dfs_unlink(oldpath);;
-
-failure:
-        LOG("%s (%d)", dpl_status_str(rc), rc);
-        return -1;
-}
-
-static int
-dfs_chmod(const char *path,
-          mode_t mode)
-{
-        LOG("%s", path);
-
-        dpl_dict_t *metadata = NULL;
-
-        dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        if (! metadata)
-                metadata = dpl_dict_new(13);
-
-        assign_meta_to_dict(metadata, "mode", &mode);
-        rc = dpl_setattr(ctx, (char *)path, metadata);
-
-        dpl_dict_free(metadata);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        return 0;
-
-failure:
-        LOG("dpl_setattr: %s (%d)", dpl_status_str(rc), rc);
-        return -1;
-}
-
-static int
-dfs_chown(const char *path,
-          uid_t uid,
-          gid_t gid)
-{
-        LOG("%s", path);
-
-        dpl_dict_t *metadata = NULL;
-
-        dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        if (! metadata)
-                return 0;
-
-        assign_meta_to_dict(metadata, "uid", &uid);
-        assign_meta_to_dict(metadata, "gid", &gid);
-        rc = dpl_setattr(ctx, (char *)path, metadata);
-
-        if (metadata)
-                dpl_dict_free(metadata);
-
-        if (DPL_FAILURE == rc)
-                goto failure;
-
-        return 0;
-
-failure:
-        LOG("dpl_getattr: %s (%d)", dpl_status_str(rc), rc);
-        return -1;
 }
 
 static int
@@ -1021,7 +178,7 @@ dfs_fgetattr(const char *path,
              struct fuse_file_info *info)
 {
         LOG("%s", path);
-        return dfs_getattr(path, buf);
+        return 0;
 }
 
 static int
@@ -1126,6 +283,7 @@ struct fuse_operations dfs_ops = {
 static int
 dfs_fuse_main(struct fuse_args *args)
 {
+        hash = g_hash_table_new(g_str_hash, g_str_equal);
         return fuse_main(args->argc, args->argv, &dfs_ops, NULL);
 }
 
@@ -1169,15 +327,22 @@ droplet_pp(dpl_ctx_t *ctx)
 static void
 usage(const char * const prog)
 {
-        printf("Usage: %s <bucket> <mount point>\n", prog);
+        printf("Usage: %s <bucket> [-d] <mount point>\n", prog);
 }
 
 
 int
 main(int argc, char **argv)
 {
+        root_mode = 0;
+        debug = 0;
+        hash = NULL;
+
+        atexit(atexit_callback);
+
         int rc = EXIT_FAILURE;
         char *bucket = NULL;
+        openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
         fp = fopen("/tmp/fuse.log", "a");
         if (! fp) {
                 goto err0;
@@ -1193,7 +358,7 @@ main(int argc, char **argv)
         argv += 1;
 
         if (0 == strncmp(argv[1], "-d", 2)) {
-                debug = true;
+                debug = 1;
                 argc -= 1;
                 argv += 1;
         }
@@ -1216,6 +381,8 @@ main(int argc, char **argv)
 
         rc = dfs_fuse_main(&args);
         dpl_ctx_free(ctx);
+        g_hash_table_remove_all(hash);
+
 err2:
 	dpl_free();
 err1:
