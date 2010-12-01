@@ -14,22 +14,13 @@ dfs_read(const char *path,
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, fd);
 
-        struct stat st;
-        if (-1 == fstat(fd, &st))
-                goto err;
+        ret = pread(fd, buf, size, offset);
 
-        if (-1 == lseek(fd, offset, SEEK_SET))
-                goto err;
+        if (-1 == ret) {
+                LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
+                return -1;
+        }
 
-        ret = read(fd, buf, size);
-
-        if (-1 == ret)
-                goto err;
-
-        LOG("%s - successfully read %d bytes", path, ret);
+        LOG("%s - %d bytes read", path, ret);
         return ret;
-
-  err:
-        LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
-        return -1;
 }
