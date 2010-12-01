@@ -31,6 +31,27 @@ dfs_write(const char *path,
         fill_metadata_from_stat(dict, &st);
         assign_meta_to_dict(dict, "size", &size);
 
+        struct pentry *pe = NULL;
+        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        if (! pe) {
+                char local[128] = "";
+                snprintf(local, sizeof local, "/tmp/%s/%s",
+                         ctx->cur_bucket, path);
+                pe = pentry_new();
+                pentry_ctor(pe, -1);
+                pe->fd = open(local, O_WRONLY);
+        }
+
+        if (-1 == pe->fd) {
+                ret = -errno;
+                goto err;
+        }
+
+        if (-1 == pwrite(pe->fd, buf, size, offset)) {
+                ret = -errno;
+                goto err;
+        }
+
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
@@ -44,7 +65,7 @@ dfs_write(const char *path,
                 goto err;
         }
 
-        if (-1 == read_all(fd, (char *)buf, vfile))
+        if (-1 == read_all(pe->fd, (char *)buf, vfile))
                 goto err;
 
         ret = size;
