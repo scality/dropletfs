@@ -7,30 +7,36 @@ dfs_open(const char *path,
 {
         LOG("%s", path);
 
-        struct pentry *pentry = NULL;
+        struct pentry *pe = NULL;
 
         PRINT_FLAGS(path, info);
-        pentry = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
-        if (! pentry) {
-                pentry = pentry_new();
-                pentry_ctor(pentry, -1);
+        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        if (! pe) {
+                pe = pentry_new();
+                pentry_ctor(pe, -1);
         }
 
         /* open in order to write on remote fs */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
                 /* TODO: handle the case where we overwrite a file */
-
+                char local[128] = "";
+                snprintf(local, sizeof local, "/tmp/%s/%s",
+                         ctx->cur_bucket, path);
+                pe->fd = open(local, O_WRONLY|O_CREAT|O_EXCL);
         } else {
                 /* otherwise we simply want to read the file */
-                if (-1 == pentry->fd) {
-                        pentry->fd = dfs_get_local_copy(ctx, path);
+                if (-1 == pe->fd) {
+                        pe->fd = dfs_get_local_copy(ctx, path);
                         LOG("info->fh = dfs_get_local_copy(...)");
                 }
         }
 
-        info->fh = (uint64_t)pentry;
+        if (-1 == pe->fd)
+                LOG("%s: %s", path, strerror(errno));
+
+        info->fh = (uint64_t)pe;
 
         LOG("open @pentry=%p, fd=%d, flags=0x%X",
-            pentry, pentry->fd, info->flags);
+            pe, pe->fd, info->flags);
         return 0;
 }

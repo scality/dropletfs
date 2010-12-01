@@ -29,22 +29,28 @@ dfs_create(const char *path,
                 return -1;
         }
 
-        /* OK, is it a regular file? */
-        switch (DPL_FTYPE_REG != type) {
-                LOG("Unsupported filetype %s (%d)", dfs_ftypetostr(type), type);
-                return EIO;
-        }
-
         dpl_dict_t *dict = dpl_dict_new(13);
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
-        char *remote = strrchr(path, '/');
-        if (! remote)
-                remote = (char *)path;
-        else
-                remote++;
 
-        fill_default_metadata(dict);
+        ret = dfs_open(path, info);
+        if (ret < 0) {
+                ret = -1;
+                goto err;
+        }
+
+        ret = 0;
+
+        struct pentry *pe = (struct pentry *)info->fh;
+        struct stat st;
+        if (-1 == fstat(pe->fd, &st)) {
+                ret = -errno;
+                goto err;
+        }
+
+        fchmod(pe->fd, mode);
+
+        fill_metadata_from_stat(dict, &st);
         assign_meta_to_dict(dict, "mode", &mode);
 
         rc = dpl_openwrite(ctx,
@@ -55,24 +61,17 @@ dfs_create(const char *path,
                            0,
                            &vfile);
 
-        dpl_dict_free(dict);
-
-        LOG("");
-        if (DPL_SUCCESS == rc)
-                ret = dfs_open(path, info);
-
-        if (vfile) {
-                LOG("");
-                rc = dpl_close(vfile);
-                LOG("");
-                if (DPL_SUCCESS != rc) {
-                        LOG("dpl_close: %s (%d)", dpl_status_str(rc), rc);
-                        return -1;
-                }
+        if (DPL_SUCCESS != rc) {
+                ret = -1;
+                goto err;
         }
 
-  err:
-        LOG("exiting function");
+        if (vfile)
+                rc = dpl_close(vfile);
 
-        return 0;
+  err:
+        dpl_dict_free(dict);
+        LOG("exiting function (return value=%d)", ret);
+
+        return ret;
 }
