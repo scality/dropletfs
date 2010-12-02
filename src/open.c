@@ -35,6 +35,7 @@ dfs_open(const char *path,
                 LOG("%s: %s", path, strerror(errno));
 
         info->fh = (uint64_t)pe;
+        info->direct_io = 1;
 
         LOG("open @pentry=%p, fd=%d, flags=0x%X",
             pe, pe->fd, info->flags);
