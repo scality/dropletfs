@@ -15,6 +15,7 @@
 #include <fuse.h>
 #include <droplet.h>
 
+#include "misc.h"
 #include "hash.h"
 
 extern dpl_ctx_t *ctx;
@@ -22,13 +23,6 @@ extern FILE *fp;
 extern mode_t root_mode;
 extern int debug;
 extern GHashTable *hash;
-
-
-
-#define _STRIZE(arg) #arg
-#define STRIZE(x)  _STRIZE(x)
-
-#define NB_ELEM(a) ((sizeof a) / (sizeof a[0]))
 
 
 
