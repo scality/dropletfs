@@ -13,6 +13,11 @@ dfs_create(const char *path,
         dpl_ino_t ino, obj, parent;
         int ret = -1;
 
+        if (! S_ISREG(mode)) {
+                LOG("%s: not a regular file", path);
+                goto err;
+        }
+
         ino = dpl_cwd(ctx, ctx->cur_bucket);
         dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                                     ino, &parent, &obj, &type);
@@ -44,6 +49,7 @@ dfs_create(const char *path,
         struct pentry *pe = (struct pentry *)info->fh;
         struct stat st;
         if (-1 == fstat(pe->fd, &st)) {
+                LOG("fstat failed: %s", strerror(errno));
                 ret = -errno;
                 goto err;
         }
@@ -52,6 +58,9 @@ dfs_create(const char *path,
 
         fill_metadata_from_stat(dict, &st);
         assign_meta_to_dict(dict, "mode", &mode);
+
+        while ('/' == *path)
+                path++;
 
         rc = dpl_openwrite(ctx,
                            (char *)path,
@@ -62,16 +71,18 @@ dfs_create(const char *path,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
+                LOG("dpl_openwrite failed (%s)", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
 
-        if (vfile)
-                rc = dpl_close(vfile);
-
   err:
-        dpl_dict_free(dict);
-        LOG("exiting function (return value=%d)", ret);
+        if (vfile)
+                (void)dpl_close(vfile);
 
+        if (dict)
+                dpl_dict_free(dict);
+
+        LOG("exiting function (return value=%d)", ret);
         return ret;
 }
