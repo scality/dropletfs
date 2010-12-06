@@ -1,5 +1,5 @@
 #include "metadata.h"
-
+#include "tmpstr.h"
 
 void
 assign_meta_to_dict(dpl_dict_t *dict,
@@ -8,10 +8,10 @@ assign_meta_to_dict(dpl_dict_t *dict,
 {
         unsigned long val = *(unsigned long*)v;
         dpl_var_t *var = NULL;
-        char buf[128] = "";
         if (NULL != (var = dpl_dict_get(dict, meta)))
                 dpl_dict_remove(dict, var);
-        snprintf(buf, sizeof buf, "%lu", val);
+
+        char *buf = tmpstr_printf("%lu", val);
         dpl_dict_add(dict, meta, buf, 0);
 }
 

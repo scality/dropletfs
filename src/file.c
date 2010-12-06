@@ -1,7 +1,7 @@
 #include <libgen.h>
 
 #include "file.h"
-
+#include "tmpstr.h"
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -164,11 +164,10 @@ int
 dfs_get_local_copy(dpl_ctx_t *ctx,
                    const char *remote)
 {
-        char local[256] = "";
         dpl_dict_t *metadata = NULL;
         struct get_data get_data = { .fd = -1, .fp = NULL, .buf = NULL };
 
-        snprintf(local, sizeof local, "/tmp/%s/%s", ctx->cur_bucket, remote);
+        char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
 
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
 

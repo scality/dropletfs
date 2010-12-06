@@ -1,5 +1,6 @@
 #include "glob.h"
 #include "file.h"
+#include "tmpstr.h"
 
 int
 dfs_open(const char *path,
@@ -19,16 +20,13 @@ dfs_open(const char *path,
         /* open in order to write on remote fs */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
                 /* TODO: handle the case where we overwrite a file */
-                char local[128] = "";
-                snprintf(local, sizeof local, "/tmp/%s/%s",
-                         ctx->cur_bucket, path);
-                pe->fd = open(local, O_WRONLY|O_CREAT|O_EXCL);
+                char *file = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
+                LOG("opening cache file '%s'", file);
+                pe->fd = open(file, O_WRONLY|O_CREAT|O_EXCL);
         } else {
                 /* otherwise we simply want to read the file */
-                if (-1 == pe->fd) {
+                if (-1 == pe->fd)
                         pe->fd = dfs_get_local_copy(ctx, path);
-                        LOG("info->fh = dfs_get_local_copy(...)");
-                }
         }
 
         if (-1 == pe->fd)

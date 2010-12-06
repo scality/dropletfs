@@ -34,12 +34,10 @@ dfs_write(const char *path,
         struct pentry *pe = NULL;
         pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
         if (! pe) {
-                char local[128] = "";
-                snprintf(local, sizeof local, "/tmp/%s/%s",
-                         ctx->cur_bucket, path);
+                char *file = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
                 pe = pentry_new();
                 pentry_ctor(pe, -1);
-                pe->fd = open(local, O_WRONLY);
+                pe->fd = open(file, O_WRONLY);
         }
 
         if (-1 == pe->fd) {
