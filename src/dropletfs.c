@@ -267,7 +267,6 @@ struct fuse_operations dfs_ops = {
         .destroy    = dfs_destroy,
         .access     = dfs_access,
         .ftruncate  = dfs_ftruncate,
-        .fgetattr   = dfs_fgetattr,
         .lock       = dfs_lock,
         .utimens    = dfs_utimens,
         .bmap       = dfs_bmap,
