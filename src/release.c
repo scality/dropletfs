@@ -4,7 +4,7 @@ int
 dfs_release(const char *path,
             struct fuse_file_info *info)
 {
-        struct pentry *pe = info->fh;
+        struct pentry *pe = (struct pentry *)info->fh;
         if (! pe)
                 return 0;
 

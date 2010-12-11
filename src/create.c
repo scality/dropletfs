@@ -11,10 +11,11 @@ dfs_create(const char *path,
         PRINT_FLAGS(path, info);
         dpl_ftype_t type;
         dpl_ino_t ino, obj, parent;
-        int ret = -1;
+        int ret = 0;
 
         if (! S_ISREG(mode)) {
                 LOG("%s: not a regular file", path);
+                ret = -1;
                 goto err;
         }
 
@@ -38,15 +39,10 @@ dfs_create(const char *path,
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
 
-        ret = dfs_open(path, info);
-        if (ret < 0) {
-                ret = -1;
-                goto err;
-        }
-
-        ret = 0;
+        (void)dfs_open(path, info);
 
         struct pentry *pe = (struct pentry *)info->fh;
+
         struct stat st;
         if (-1 == fstat(pe->fd, &st)) {
                 LOG("fstat failed: %s", strerror(errno));

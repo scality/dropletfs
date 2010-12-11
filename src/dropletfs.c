@@ -379,15 +379,22 @@ main(int argc, char **argv)
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
+        char *cache_dir = tmpstr_printf("/tmp/%s", ctx->cur_bucket);
+        if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
+                LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
+                goto err3;
+        }
+
         rc = dfs_fuse_main(&args);
+
+  err3:
         dpl_ctx_free(ctx);
         g_hash_table_remove_all(hash);
-
-err2:
+  err2:
 	dpl_free();
-err1:
+  err1:
         fclose(fp);
-err0:
+  err0:
 	return rc;
 }
 

@@ -8,12 +8,13 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
-        int fd = ((struct pentry *)info->fh)->fd;
-        LOG("entering... remote=%s, info->fh=%d", path, fd);
+        struct pentry *pe = (struct pentry *)info->fh;
+        LOG("entering... remote=%s, fd=%d", path, pe->fd);
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
-        if (-1 == fd) {
+
+        if (-1 == pe->fd) {
                 LOG("invalid fd (-1)");
                 return;
         }
@@ -22,7 +23,7 @@ dfs_write(const char *path,
         dpl_dict_t *dict = dpl_dict_new(13);
 
         struct stat st;
-        if (-1 == fstat(fd, &st)) {
+        if (-1 == fstat(pe->fd, &st)) {
                 LOG("fstat failed: %s (%d)", strerror(errno), errno);
                 ret = -errno;
                 goto err;
@@ -30,20 +31,6 @@ dfs_write(const char *path,
 
         fill_metadata_from_stat(dict, &st);
         assign_meta_to_dict(dict, "size", &size);
-
-        struct pentry *pe = NULL;
-        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
-        if (! pe) {
-                char *file = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
-                pe = pentry_new();
-                pentry_ctor(pe, -1);
-                pe->fd = open(file, O_WRONLY);
-        }
-
-        if (-1 == pe->fd) {
-                ret = -errno;
-                goto err;
-        }
 
         if (-1 == pwrite(pe->fd, buf, size, offset)) {
                 ret = -errno;

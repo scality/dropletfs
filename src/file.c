@@ -56,7 +56,7 @@ read_all(int fd,
         {
                 int r = read(fd, buf, blksize);
                 if (-1 == r) {
-                        LOG("read - %s", strerror(errno));
+                        LOG("read on fd=%d %s", fd, strerror(errno));
                         return -1;
                 }
 

@@ -70,15 +70,6 @@ dfs_getattr(const char *path,
                 return -1;
         }
 
-        struct pentry *pe = g_hash_table_find(hash,
-                                              pentry_cmp_callback,
-                                              (char *)path);
-        if (! pe) {
-                pe = pentry_new();
-                pentry_ctor(pe, -1);
-                g_hash_table_insert(hash, (char *)path, pe);
-        }
-
         set_default_stat(st, type);
         if (metadata) {
                 fill_stat_from_metadata(st, metadata);
