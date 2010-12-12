@@ -10,6 +10,7 @@
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
 
+#include "tmpstr.h"
 #include "glob.h"
 
 
