@@ -13,11 +13,11 @@ dfs_release(const char *path,
         if (-1 != pe->fd)
                 close(pe->fd);
 
-/*         char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path); */
-/*         if (-1 == unlink(local)) */
-/*                 LOG("unlink cache file(%s): %s", local); */
+        char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
+        if (-1 == unlink(local))
+                LOG("unlink cache file(%s): %s", local, strerror(errno));
 
-/*         g_hash_table_remove(hash, (char *)path); */
+        g_hash_table_remove(hash, (char *)path);
 
         return 0;
 }
