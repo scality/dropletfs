@@ -34,11 +34,10 @@ dfs_open(const char *path,
         } else {
                 /* otherwise we simply want to read the file */
                 if (-1 == pe->fd)
-                        pe->fd = dfs_get_local_copy(ctx, path);
+                        pe->fd = dfs_get_local_copy(ctx, pe, path);
         }
 
   err:
-        LOG("open @pentry=%p, fd=%d, flags=0x%X",
-            pe, pe->fd, info->flags);
+        LOG("@pentry=%p, fd=%d, flags=0x%X", pe, pe->fd, info->flags);
         return 0;
 }

@@ -158,10 +158,46 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
 }
 
 
+int
+dfs_md5cmp(dpl_ctx_t *ctx,
+           const char *const md5,
+           char *path)
+{
+        dpl_dict_t *dict = NULL;
+        char *remote_md5 = NULL;
+        int diff = 1;
+        dpl_status_t rc;
+
+        dpl_ino_t ino, obj_ino;
+        rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
+
+        if (DPL_ENOENT == rc)
+                return diff;
+
+        rc = dpl_head(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
+
+        if (DPL_SUCCESS != rc)
+                goto err;
+
+        if (dict)
+                remote_md5 = dpl_dict_get_value(dict, "md5");
+
+        if (remote_md5)
+                diff = strncmp(md5, remote_md5, MD5_DIGEST_LENGTH);
+
+  err:
+        if (dict)
+                dpl_dict_free(dict);
+
+        return diff;
+
+}
+
 
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(dpl_ctx_t *ctx,
+                   struct pentry *pe,
                    const char *remote)
 {
         dpl_dict_t *metadata = NULL;
@@ -170,6 +206,9 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
         char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
 
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
+
+        if (0 == dfs_md5cmp(ctx, pe->digest, (char *)remote))
+                return pe->fd;
 
         char *tmp_local = strdup(local);
         if (! tmp_local) {
