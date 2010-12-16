@@ -1,4 +1,4 @@
-DPL_DIR=../../Droplet-fork/libdroplet
+DPL_DIR=../../Droplet/libdroplet
 
 DPL_INC_DIR=$(DPL_DIR)/include
 DPL_LIB_DIR=$(DPL_DIR)/lib
@@ -28,7 +28,7 @@ dplfs: $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) -o $@ -c $< $(CFLAGS)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJ) *~ $(bin)
