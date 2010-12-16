@@ -9,13 +9,14 @@ dfs_write(const char *path,
           struct fuse_file_info *info)
 {
         struct pentry *pe = (struct pentry *)info->fh;
-        LOG("entering... remote=%s, fd=%d", path, pe->fd);
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
+            path, (void *)buf, size, (long long)offset, pe->fd);
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
 
         if (-1 == pe->fd) {
-                LOG("invalid fd (-1)");
+                LOG("invalid fd... exiting");
                 return;
         }
 

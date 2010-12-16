@@ -77,16 +77,17 @@ metadatatoll(dpl_dict_t *dict,
 {
         char *value = dpl_dict_get_value(dict, (char *)name);
 
-        if (! value)
+        if (! value) {
+                LOG("can't grab any meta '%s'", name);
                 return -1;
+        }
 
+        long long v = strtoull(value, NULL, 10);
         if (0 == strcmp(name, "mode"))
-                LOG("meta=%s, value=0x%x",
-                    name,
-                    (unsigned)strtoul(value, NULL, 10));
+                LOG("meta=%s, value=0x%x", name, (unsigned)v);
         else
                 LOG("meta=%s, value=%s", name, value);
-        return (long long)strtoul(value, NULL, 10);
+        return v;
 }
 
 #define STORE_META(st, dict, name, type) do {                           \

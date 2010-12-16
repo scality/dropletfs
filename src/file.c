@@ -27,8 +27,8 @@ write_all(int fd,
 	int remain;
 
 	remain = len;
-	while (/*CONSTCOND*/ 1)	{
-again:
+	while (1) {
+          again:
 		cc = write(fd, buf, remain);
 		if (-1 == cc) {
 			if (EINTR == errno)
@@ -49,7 +49,7 @@ read_all(int fd,
          char *buf,
          dpl_vfile_t *vfile)
 {
-        dpl_status_t ret = DPL_FAILURE;
+        dpl_status_t rc = DPL_FAILURE;
         static int blksize = 4096;
 
         while (1)
@@ -63,9 +63,9 @@ read_all(int fd,
                 if (0 == r)
                         break;
 
-                ret = dpl_write(vfile, buf, r);
-                if (DPL_SUCCESS != ret) {
-                        LOG("dpl_write: %s (%d)", dpl_status_str(ret), ret);
+                rc = dpl_write(vfile, buf, r);
+                if (DPL_SUCCESS != rc) {
+                        LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
                         return -1;
                 }
         }
@@ -74,7 +74,7 @@ read_all(int fd,
 }
 
 
-dpl_status_t
+int
 cb_get_buffered(void *arg,
                 char *buf,
                 unsigned len)
@@ -99,8 +99,7 @@ cb_get_buffered(void *arg,
         }
 
         ret = 0;
-end:
-
+  end:
         return ret;
 }
 
@@ -118,7 +117,7 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
         dpl_vfile_t *vfile = NULL;
         dpl_status_t ret = DPL_FAILURE;
         if (-1 == fd) {
-                LOG("invalid fd (-1)");
+                LOG("invalid fd");
                 return;
         }
 

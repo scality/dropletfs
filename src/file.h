@@ -17,7 +17,7 @@ int write_all(int, char *, int);
 
 int read_all(int, char *, dpl_vfile_t *);
 
-dpl_status_t cb_get_buffered(void *, char *, unsigned);
+int cb_get_buffered(void *, char *, unsigned);
 
 void dfs_put_local_copy(dpl_ctx_t *, dpl_dict_t *, struct fuse_file_info *, const char *);
 
