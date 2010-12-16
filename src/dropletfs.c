@@ -24,14 +24,7 @@ static void
 atexit_callback(void)
 {
         g_hash_table_remove_all(hash);
-
-        if (ctx)
-                dpl_ctx_free(ctx);
-
 	dpl_free();
-
-        if (fp)
-                fclose(fp);
 }
 
 
