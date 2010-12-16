@@ -8,15 +8,21 @@
 struct pentry {
         int fd;
         char digest[MD5_DIGEST_LENGTH];
+        dpl_dict_t *metadata;
 };
 
-struct pentry * pentry_new(void);
 
-void pentry_ctor(struct pentry *pe, int fd);
+struct pentry *pentry_new(void);
 
-gboolean pentry_cmp_callback(gpointer key, gpointer value, gpointer data);
+void pentry_set_fd(struct pentry *, int);
 
-int get_fd_from_path(char *path);
+void pentry_set_metadata(struct pentry *, dpl_dict_t *);
+
+void pentry_ctor(struct pentry *, int, dpl_dict_t *);
+
+gboolean pentry_cmp_callback(gpointer, gpointer, gpointer);
+
+int get_fd_from_path(char *);
 
 
 #endif

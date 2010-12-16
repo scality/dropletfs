@@ -1,5 +1,27 @@
+#include <assert.h>
+
 #include "metadata.h"
 #include "tmpstr.h"
+
+
+static void
+cb_var_copy(dpl_var_t *var,
+            void *arg)
+{
+        dpl_dict_t *dst = arg;
+        dpl_dict_add(dst, var->key, var->value, 0);
+}
+
+void
+copy_metadata(dpl_dict_t *dst, dpl_dict_t *src)
+{
+        assert(dst);
+
+        if (src)
+                dpl_dict_iterate(src, cb_var_copy, dst);
+        else
+                dpl_dict_free(dst);
+}
 
 void
 assign_meta_to_dict(dpl_dict_t *dict,
@@ -8,10 +30,18 @@ assign_meta_to_dict(dpl_dict_t *dict,
 {
         unsigned long val = *(unsigned long*)v;
         dpl_var_t *var = NULL;
-        if (NULL != (var = dpl_dict_get(dict, meta)))
-                dpl_dict_remove(dict, var);
 
-        char *buf = tmpstr_printf("%lu", val);
+        if (NULL != (var = dpl_dict_get(dict, meta))) {
+                if (!strcmp("size", meta)) {
+                        unsigned long size = strtoul(var->value, NULL, 10);
+                        val += size;
+                }
+                dpl_dict_remove(dict, var);
+        }
+
+/*         char *buf = tmpstr_printf("%lu", val); */
+        char buf[4096] = "";
+        snprintf(buf, sizeof buf, "%lu", val);
         dpl_dict_add(dict, meta, buf, 0);
 }
 

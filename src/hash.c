@@ -9,14 +9,38 @@ pentry_new(void)
                 exit(EXIT_FAILURE);
         }
 
+        pe->metadata = dpl_dict_new(13);
         return pe;
 }
 
 void
-pentry_ctor(struct pentry *pe,
-            int fd)
+pentry_free(struct pentry *pe)
+{
+        dpl_dict_free(pe->metadata);
+        free(pe);
+}
+
+void
+pentry_set_fd(struct pentry *pe,
+              int fd)
 {
         pe->fd = fd;
+}
+
+void
+pentry_set_metadata(struct pentry *pe,
+                    dpl_dict_t *meta)
+{
+        copy_metadata(pe->metadata, meta);
+}
+
+void
+pentry_ctor(struct pentry *pe,
+            int fd,
+            dpl_dict_t *meta)
+{
+        pentry_set_fd(pe, fd);
+        pentry_set_metadata(pe, meta);
 }
 
 gboolean

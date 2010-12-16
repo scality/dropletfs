@@ -3,6 +3,8 @@
 
 #include "glob.h"
 
+void copy_metadata(dpl_dict_t *dst, dpl_dict_t *src);
+
 void assign_meta_to_dict(dpl_dict_t *dict, char *meta, void *v);
 
 void fill_metadata_from_stat(dpl_dict_t *dict, struct stat *st);

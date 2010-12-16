@@ -247,8 +247,10 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                 return -1;
         }
 
-        if (metadata)
+        if (metadata) {
+                pentry_set_metadata(pe, metadata);
                 dpl_dict_free(metadata);
+        }
 
 err:
         fsync(get_data.fd);

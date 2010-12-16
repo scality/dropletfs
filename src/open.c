@@ -14,7 +14,7 @@ dfs_open(const char *path,
         pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
         if (! pe) {
                 pe = pentry_new();
-                pentry_ctor(pe, -1);
+                pentry_set_fd(pe, -1);
         }
 
         info->fh = (uint64_t)pe;
