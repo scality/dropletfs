@@ -9,4 +9,7 @@
 #define STRIZE(x)  _STRIZE(x)
 
 
+void mkdir_tree(const char *);
+
+
 #endif

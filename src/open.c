@@ -1,6 +1,18 @@
+#include <libgen.h>
+
 #include "glob.h"
 #include "file.h"
 #include "tmpstr.h"
+
+
+static void
+build_cache_tree(char *path)
+{
+        char cache[4096] = "";
+        snprintf(cache, sizeof cache, "/tmp/%s/%s", ctx->cur_bucket, path);
+        mkdir_tree(cache);
+}
+
 
 int
 dfs_open(const char *path,
