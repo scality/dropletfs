@@ -29,11 +29,8 @@ extern GHashTable *hash;
 #define LOG(fmt, ...)                                                   \
         do {                                                            \
                 if (! debug) break;                                     \
-                time_t t = time(NULL);                                  \
-                char buf[256] = "";                                     \
-                strftime(buf, sizeof buf, "%T", gmtime(&t));            \
-                syslog(LOG_INFO, "%s %s:%s():%d -- " fmt "",            \
-                        buf, __FILE__, __func__, __LINE__, ##__VA_ARGS__); \
+                syslog(LOG_INFO, "%s:%s():%d -- " fmt "",               \
+                       __FILE__, __func__, __LINE__, ##__VA_ARGS__);    \
         } while (/*CONSTCOND*/0)
 
 #define DPL_CHECK_ERR(func, rc, path)                                   \
