@@ -6,7 +6,7 @@ dfs_rename(const char *oldpath,
 {
         LOG("%s -> %s", oldpath, newpath);
 
-        struct get_data get_data = { .fd = -1, .buf = NULL, .fp = NULL };
+        struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_vfile_t *vfile = NULL;
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_dict_t *dict = NULL;

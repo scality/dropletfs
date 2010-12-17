@@ -82,25 +82,11 @@ cb_get_buffered(void *arg,
         struct get_data *get_data = arg;
         dpl_status_t ret = DPL_SUCCESS;
 
-        if (NULL != get_data->fp) {
-                size_t s;
+        ret = write_all(get_data->fd, buf, len);
+        if (DPL_SUCCESS != ret)
+                return -1;
 
-                s = fwrite(buf, 1, len, get_data->fp);
-                if (s != len) {
-                        perror("fwrite");
-                        return -1;
-                }
-        } else {
-                ret = write_all(get_data->fd, buf, len);
-                if (DPL_SUCCESS != ret) {
-                        ret = -1;
-                        goto end;
-                }
-        }
-
-        ret = 0;
-  end:
-        return ret;
+        return 0;
 }
 
 
@@ -200,12 +186,15 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                    const char *remote)
 {
         dpl_dict_t *metadata = NULL;
-        struct get_data get_data = { .fd = -1, .fp = NULL, .buf = NULL };
+        struct get_data get_data = { .fd = -1, .buf = NULL };
 
         char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
 
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
 
+        /* If the remote MD5 matches a cache file, we don't have to download
+         * it again, just return the (open) file descriptor of the cache file
+         */
         if (0 == dfs_md5cmp(ctx, pe->digest, (char *)remote))
                 return pe->fd;
 
@@ -221,7 +210,8 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
 
         free(tmp_local);
 
-        /* a cache file already exist, remove it */
+        /* a cache file already exist, its MD5 digest is different, so...
+         * just remove it */
         if (0 == access(local, F_OK))
                 unlink(local);
 
@@ -233,7 +223,7 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
 
         dpl_status_t rc = dpl_openread(ctx,
                                        (char *)remote,
-                                       0u,
+                                       0u, /* no encryption */
                                        NULL,
                                        cb_get_buffered,
                                        &get_data,

@@ -8,7 +8,6 @@
 struct get_data {
         struct buf *buf;
         int fd;
-        FILE *fp;
 };
 
 char *dfs_ftypetostr(dpl_ftype_t);
