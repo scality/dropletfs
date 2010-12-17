@@ -179,6 +179,15 @@ dfs_md5cmp(dpl_ctx_t *ctx,
 }
 
 
+static void
+build_cache_tree(char *path)
+{
+        char cache[4096] = "";
+        snprintf(cache, sizeof cache, "/tmp/%s/%s", ctx->cur_bucket, path);
+        mkdir_tree(cache);
+}
+
+
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(dpl_ctx_t *ctx,
@@ -205,9 +214,7 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
         }
 
         char *dir = dirname(tmp_local);
-        if (-1 == mkdir(dir, 0755) && (EEXIST != errno))
-                LOG("%s: %s (%d)", dir, strerror(errno), errno);
-
+        build_cache_tree(dir);
         free(tmp_local);
 
         /* a cache file already exist, its MD5 digest is different, so...
