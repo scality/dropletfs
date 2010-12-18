@@ -9,52 +9,43 @@ dfs_write(const char *path,
           struct fuse_file_info *info)
 {
         struct pentry *pe = (struct pentry *)info->fh;
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
-            path, (void *)buf, size, (long long)offset, pe->fd);
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
-
-        if (-1 == pe->fd) {
-                LOG("invalid fd... exiting");
-                return;
-        }
-
-        int ret = -1;
-        dpl_dict_t *dict = dpl_dict_new(13);
-
+        dpl_dict_t *dict = NULL;
         struct stat st;
-        if (-1 == fstat(pe->fd, &st)) {
-                LOG("fstat failed: %s (%d)", strerror(errno), errno);
-                ret = -errno;
-                goto err;
-        }
+        int ret = 0;
 
+        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
+            path, (void *)buf, size, (long long)offset, pe->fd);
+
+        ret = pwrite(pe->fd, buf, size, offset);
+
+        if (-1 == ret)
+                return -errno;
+
+        dict = dpl_dict_new(13);
         fill_metadata_from_stat(dict, &st);
-        assign_meta_to_dict(dict, "size", &size);
-
-        if (-1 == pwrite(pe->fd, buf, size, offset)) {
-                ret = -errno;
-                goto err;
-        }
 
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
                            dict,
                            canned_acl,
-                           size,
+                           st.st_size,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
+                ret = -1;
                 goto err;
         }
 
-        if (-1 == read_all(pe->fd, (char *)buf, vfile))
+        if (-1 == read_all(pe->fd, vfile)) {
+                ret = -1;
                 goto err;
+        }
 
-        ret = size;
   err:
         if (dict)
                 dpl_dict_free(dict);
@@ -62,5 +53,6 @@ dfs_write(const char *path,
         if (vfile)
                 dpl_close(vfile);
 
+        LOG("return value = %d", ret);
         return ret;
 }

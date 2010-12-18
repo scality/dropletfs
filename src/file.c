@@ -46,12 +46,14 @@ write_all(int fd,
 
 int
 read_all(int fd,
-         char *buf,
          dpl_vfile_t *vfile)
 {
         dpl_status_t rc = DPL_FAILURE;
         static int blksize = 4096;
+        char *buf = NULL;
 
+
+        buf = alloca(blksize);
         while (1)
         {
                 int r = read(fd, buf, blksize);
@@ -124,19 +126,10 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
                 goto err;
         }
 
-        char *buf = malloc(size);
-        if (! buf) {
-                LOG("malloc(%ld bytes): %s (%d)",
-                    size, strerror(errno), errno);
-                goto err;
-        }
-
-        if (-1 == read_all(fd, buf, vfile))
+        if (-1 == read_all(fd, vfile))
                 goto err;
 
   err:
-        if (buf)
-                free(buf);
 
         if (vfile)
                 dpl_close(vfile);
