@@ -28,6 +28,13 @@ pentry_set_fd(struct pentry *pe,
 }
 
 void
+pentry_set_flag(struct pentry *pe,
+                int flag)
+{
+        pe->flag = flag;
+}
+
+void
 pentry_set_metadata(struct pentry *pe,
                     dpl_dict_t *meta)
 {
@@ -37,9 +44,11 @@ pentry_set_metadata(struct pentry *pe,
 void
 pentry_ctor(struct pentry *pe,
             int fd,
+            int flag,
             dpl_dict_t *meta)
 {
         pentry_set_fd(pe, fd);
+        pentry_set_flag(pe, flag);
         pentry_set_metadata(pe, meta);
 }
 
