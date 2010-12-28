@@ -19,8 +19,6 @@ dfs_write(const char *path,
         if (-1 == ret)
                 return -errno;
 
-        pe->flag = FLAG_DIRTY;
-
         LOG("return value = %d", ret);
         return ret;
 }

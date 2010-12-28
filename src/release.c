@@ -17,11 +17,10 @@ dfs_release(const char *path,
 
         LOG("%s, fd=%d", path, pe->fd);
 
-        if (FLAG_DIRTY != pe->flag)
+        if (-1 == fstat(pe->fd, &st)) {
+                LOG("fstat(%d, %p) = %s", pe->fd, (void *)&st, strerror(errno));
                 goto err;
-
-        if (-1 == fstat(pe->fd, &st))
-                goto err;
+        }
 
         dict = dpl_dict_new(13);
         fill_metadata_from_stat(dict, &st);

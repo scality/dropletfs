@@ -21,10 +21,15 @@ dfs_open(const char *path,
         info->fh = (uint64_t)pe;
         info->direct_io = 1;
 
+        char *file = build_cache_tree(path);
+        if (! file) {
+                LOG("build_cache_tree(%s) was unable to build a path", path);
+                goto err;
+        }
+
         /* open in order to write on remote fs */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
                 /* TODO: handle the case where we overwrite a file */
-                char *file = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
                 LOG("opening cache file '%s'", file);
                 pe->fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
                 if (-1 == pe->fd) {

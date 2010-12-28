@@ -172,12 +172,27 @@ dfs_md5cmp(dpl_ctx_t *ctx,
 }
 
 
-static void
-build_cache_tree(char *path)
+char *
+build_cache_tree(const char *path)
 {
-        char cache[4096] = "";
-        snprintf(cache, sizeof cache, "/tmp/%s/%s", ctx->cur_bucket, path);
-        mkdir_tree(cache);
+        LOG("building cache dir for '%s'", path);
+
+        char *local = NULL;
+        char *tmp_local = NULL;
+
+        local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
+
+        tmp_local = strdup(local);
+
+        if (! tmp_local) {
+                LOG("strdup: %s (%d)", strerror(errno), errno);
+                return NULL;
+        }
+
+        mkdir_tree(dirname(tmp_local));
+        free(tmp_local);
+
+        return local;
 }
 
 
@@ -199,16 +214,6 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
          */
         if (0 == dfs_md5cmp(ctx, pe->digest, (char *)remote))
                 return pe->fd;
-
-        char *tmp_local = strdup(local);
-        if (! tmp_local) {
-                LOG("strdup: %s (%d)", strerror(errno), errno);
-                return -1;
-        }
-
-        char *dir = dirname(tmp_local);
-        build_cache_tree(dir);
-        free(tmp_local);
 
         /* a cache file already exist, its MD5 digest is different, so...
          * just remove it */
