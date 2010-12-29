@@ -81,14 +81,6 @@ dfs_flush(const char *path,
 }
 
 static int
-dfs_mknod(const char *path,
-          mode_t mode)
-{
-        LOG("%s", path);
-        return 0;
-}
-
-static int
 dfs_readlink(const char *path,
              char *buf,
              size_t bufsiz)
@@ -245,6 +237,7 @@ struct fuse_operations dfs_ops = {
         .create     = dfs_create,
         .chmod      = dfs_chmod,
         .chown      = dfs_chown,
+        .mknod      = dfs_mknod,
 
         /* not implemented yet */
         .getxattr   = dfs_getxattr,
