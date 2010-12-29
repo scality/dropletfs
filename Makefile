@@ -18,6 +18,8 @@ CFLAGS+=-g -ggdb3 -O0 $(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
 SRC=$(wildcard src/*.c)
 OBJ= $(SRC:.c=.o)
 
+DEST=/usr/local/bin
+
 bin=dplfs
 
 CC=/usr/bin/gcc
@@ -25,13 +27,17 @@ CC=/usr/bin/gcc
 all: $(bin)
 
 dplfs: $(OBJ)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o bin/$@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJ) *~ $(bin)
+	rm -f bin/$(bin)
+
+uninstall:
+	rm -f $(DEST)/$(bin)
 
 install:
-	install -m755 src/$(bin) /usr/local/bin/
+	install -m755 bin/$(bin) $(DEST)
