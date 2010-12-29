@@ -320,7 +320,12 @@ droplet_pp(dpl_ctx_t *ctx)
 static void
 usage(const char * const prog)
 {
-        printf("Usage: %s <bucket> [-d] <mount point>\n", prog);
+        printf("Usage: %s <bucket> [-d] <mount point> [options]\n", prog);
+        printf("\t<bucket>\tthe name of your remote bucket\n");
+        printf("\t-d\t\tset the debug mode. Information are written in syslog\n");
+        printf("\t<mountpoint>\tthe directory you want to use as mount point.\n");
+        printf("\t\t\tThe directory must exist\n");
+        printf("\t[options]\tfuse/mount options\n");
 }
 
 
