@@ -1,4 +1,4 @@
-DPL_DIR=../../Droplet/libdroplet
+DPL_DIR=../Droplet/libdroplet
 
 DPL_INC_DIR=$(DPL_DIR)/include
 DPL_LIB_DIR=$(DPL_DIR)/lib
@@ -15,7 +15,7 @@ CPPFLAGS+=
 LDFLAGS+=-ldroplet -lssl -lxml2 $(FUSE_LDFLAGS) $(GLIB_LDFLAGS) -L$(DPL_LIB_DIR)
 CFLAGS+=-g -ggdb3 -O0 $(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
 
-SRC=$(wildcard *.c)
+SRC=$(wildcard src/*.c)
 OBJ= $(SRC:.c=.o)
 
 bin=dplfs
@@ -33,3 +33,5 @@ dplfs: $(OBJ)
 clean:
 	rm -f $(OBJ) *~ $(bin)
 
+install:
+	install -m755 src/$(bin) /usr/local/bin/
