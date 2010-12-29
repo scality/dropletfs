@@ -35,10 +35,6 @@ dfs_create(const char *path,
                 return -1;
         }
 
-        dpl_dict_t *dict = dpl_dict_new(13);
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-        dpl_vfile_t *vfile = NULL;
-
         (void)dfs_open(path, info);
 
         struct pentry *pe = (struct pentry *)info->fh;
@@ -52,33 +48,18 @@ dfs_create(const char *path,
 
         fchmod(pe->fd, mode);
 
-        fill_metadata_from_stat(dict, &st);
-        assign_meta_to_dict(dict, "mode", &mode);
+        fill_metadata_from_stat(pe->metadata, &st);
+        assign_meta_to_dict(pe->metadata, "mode", &mode);
 
-        while ('/' == *path)
-                path++;
-
-        rc = dpl_openwrite(ctx,
-                           (char *)path,
-                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                           dict,
-                           canned_acl,
-                           0,
-                           &vfile);
+        rc = dpl_mknod(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_openwrite failed (%s)", dpl_status_str(rc));
+                LOG("dpl_mknod failed (%s)", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
 
   err:
-        if (vfile)
-                (void)dpl_close(vfile);
-
-        if (dict)
-                dpl_dict_free(dict);
-
         LOG("exiting function (return value=%d)", ret);
         return ret;
 }

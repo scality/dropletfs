@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "glob.h"
 #include "file.h"
@@ -50,10 +51,12 @@ dfs_getattr(const char *path,
 
         dpl_ftype_t type;
         dpl_ino_t ino, parent_ino, obj_ino;
+        dpl_status_t rc;
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
-        dpl_status_t rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                                    ino, &parent_ino, &obj_ino, &type);
+
+        rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
+                       ino, &parent_ino, &obj_ino, &type);
 
         LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
             dpl_status_str(rc), rc, dfs_ftypetostr(type),
