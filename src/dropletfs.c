@@ -23,7 +23,8 @@ GHashTable *hash = NULL;
 static void
 atexit_callback(void)
 {
-        g_hash_table_remove_all(hash);
+        if (hash)
+                g_hash_table_remove_all(hash);
 	dpl_free();
 }
 
