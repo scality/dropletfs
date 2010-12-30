@@ -68,7 +68,7 @@ int dfs_statfs(const char *, struct statvfs *);
 
 int dfs_open(const char *, struct fuse_file_info *);
 int dfs_create(const char *, mode_t, struct fuse_file_info *);
-int dfs_mknod(const char *, mode_t);
+int dfs_mknod(const char *, mode_t, dev_t);
 int dfs_read(const char *, char *, size_t, off_t, struct fuse_file_info *);
 int dfs_write(const char *, const char *, size_t, off_t, struct fuse_file_info *);
 int dfs_release(const char *, struct fuse_file_info *);

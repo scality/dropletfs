@@ -2,7 +2,8 @@
 
 int
 dfs_mknod(const char *path,
-          mode_t mode)
+          mode_t mode,
+          dev_t dev)
 {
         dpl_status_t rc;
 
