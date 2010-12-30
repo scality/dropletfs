@@ -8,7 +8,8 @@ it by yourself.  It relies on the Droplet library, so grab it!
 	$ cd Droplet
 	$ make
 
-Then go to the dropletfs-fuse directory:
+Then go to the dropletfs-fuse directory, set the DPL_DIR to /path/to/Droplet
+in the Makefile and type:
 
 	$ make
 	$ sudo make install
@@ -17,7 +18,7 @@ Now, mount your cloud storage wherever you want, and enjoy!
 
 	$ sudo mkdir /mnt/cloud
 	$ dplfs <my bucketname> /mnt/cloud
-	$ ls /tmp/cloud
+	$ ls /mnt/cloud
 	total 0
 	-rw-r--r-- 1 poz poz      10 Dec 20 16:18 bar
 	dr-x------ 1 poz fuse      0 Dec 30 23:20 code/
