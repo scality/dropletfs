@@ -1,5 +1,7 @@
 Dropletfs-fuse, a FUSE filesystem for cloud storage, using the Scality
-Droplet library [1]
+Droplet library [1].  Be sure to read and configure your environment as
+explained in [2].
+
 
 This program is not packaged yet, as far as I know.  You'll have to compile
 it by yourself.  It relies on the Droplet library, so grab it!
@@ -36,3 +38,4 @@ Please report bugs and comments to:
 
 
 [1] http://github.com/scality/Droplet
+[2] http://github.com/scality/Droplet/wiki/Configuration-file
