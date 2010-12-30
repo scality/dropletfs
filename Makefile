@@ -27,6 +27,8 @@ CC=/usr/bin/gcc
 all: $(bin)
 
 dplfs: $(OBJ)
+	# since git can't add an empty dir (see the git faq), let's do it there...
+	mkdir -p bin
 	$(CC) -o bin/$@ $^ $(LDFLAGS)
 
 %.o: %.c
