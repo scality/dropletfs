@@ -1,0 +1,37 @@
+Dropletfs-fuse, a FUSE filesystem for cloud storage, using the Scality
+Droplet library [1]
+
+This program is not packaged yet, as far as I know.  You'll have to compile
+it by yourself.  It relies on the Droplet library, so grab it!
+
+	$ git clone git://github.com/scality/Droplet
+	$ cd Droplet
+	$ make
+
+Then go to the dropletfs-fuse directory:
+
+	$ make
+	$ sudo make install
+
+Now, mount your cloud storage wherever you want, and enjoy!
+
+	$ sudo mkdir /tmp/cloud
+	$ dplfs <my bucketname> /tmp/cloud
+	$ ls /tmp/cloud
+	total 0
+	-rw-r--r-- 1 poz poz      10 Dec 20 16:18 bar
+	dr-x------ 1 poz fuse      0 Dec 30 23:20 code/
+	dr-x------ 1 poz fuse      0 Dec 30 23:20 fix/
+	-rw-r--r-- 1 poz poz       4 Dec 12 17:19 foo.backup
+	dr-x------ 1 poz fuse      0 Dec 30 23:20 hey/
+	-rw-r--r-- 1 poz poz  214642 Dec 20 16:12 metro.pdf
+	dr-x------ 1 poz fuse      0 Dec 30 23:20 test/
+	-rw-r--r-- 1 poz poz     538 Dec 29 11:40 tmpstr.c
+	-rw-r--r-- 1 poz poz     111 Dec 29 12:19 tmpstr.h
+	$
+
+Please report bugs and comments to:
+	https://github.com/pozdnychev/dropletfs-fuse/issues
+
+
+[1] http://github.com/scality/Droplet
