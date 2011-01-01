@@ -11,7 +11,7 @@ int
 dfs_release(const char *path,
             struct fuse_file_info *info)
 {
-        struct pentry *pe = (struct pentry *)info->fh;
+        struct pentry *pe = NULL;
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
@@ -19,6 +19,7 @@ dfs_release(const char *path,
         struct stat st;
         int ret = 0;
 
+        pe = (struct pentry *)info->fh;
         if (! pe)
                 return 0;
 

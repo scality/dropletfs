@@ -17,19 +17,22 @@ dfs_rename(const char *oldpath,
         dpl_vfile_t *vfile = NULL;
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_dict_t *dict = NULL;
-        dpl_status_t rc = dpl_openread(ctx,
-                                       (char *)oldpath,
-                                       0u,
-                                       NULL,
-                                       cb_get_buffered,
-                                       &get_data,
-                                       &dict);
+        dpl_status_t rc = DPL_FAILURE;
+        size_t size = 0;
+        char *str_size = NULL;
+
+        rc = dpl_openread(ctx,
+                          (char *)oldpath,
+                          0u,
+                          NULL,
+                          cb_get_buffered,
+                          &get_data,
+                          &dict);
 
         if (DPL_FAILURE == rc)
                 goto failure;
 
-        size_t size = 0;
-        char *str_size = dpl_dict_get_value(dict, "size");
+        str_size = dpl_dict_get_value(dict, "size");
         if (str_size)
                 size = (size_t)strtoul(str_size, NULL, 10);
 

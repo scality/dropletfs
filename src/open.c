@@ -11,11 +11,12 @@ int
 dfs_open(const char *path,
          struct fuse_file_info *info)
 {
-        LOG("%s", path);
-
         struct pentry *pe = NULL;
+        char *file = NULL;
 
+        LOG("%s", path);
         PRINT_FLAGS(path, info);
+
         pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
         if (! pe) {
                 pe = pentry_new();
@@ -25,7 +26,8 @@ dfs_open(const char *path,
         info->fh = (uint64_t)pe;
         info->direct_io = 1;
 
-        char *file = build_cache_tree(path);
+        file = build_cache_tree(path);
+
         if (! file) {
                 LOG("build_cache_tree(%s) was unable to build a path", path);
                 goto err;

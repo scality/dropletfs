@@ -9,8 +9,7 @@ static void
 cb_var_copy(dpl_var_t *var,
             void *arg)
 {
-        dpl_dict_t *dst = arg;
-        dpl_dict_add(dst, var->key, var->value, 0);
+        dpl_dict_add((dpl_dict_t *)arg, var->key, var->value, 0);
 }
 
 void
@@ -29,19 +28,21 @@ assign_meta_to_dict(dpl_dict_t *dict,
                     char *meta,
                     void *v)
 {
-        unsigned long val = *(unsigned long*)v;
+        unsigned long val = 0;
+        unsigned long size = 0;
         dpl_var_t *var = NULL;
+        char buf[4096] = "";
+
+        val = *(unsigned long*)v;
 
         if (NULL != (var = dpl_dict_get(dict, meta))) {
                 if (!strcmp("size", meta)) {
-                        unsigned long size = strtoul(var->value, NULL, 10);
+                        size = strtoul(var->value, NULL, 10);
                         val += size;
                 }
                 dpl_dict_remove(dict, var);
         }
 
-/*         char *buf = tmpstr_printf("%lu", val); */
-        char buf[4096] = "";
         snprintf(buf, sizeof buf, "%lu", val);
         dpl_dict_add(dict, meta, buf, 0);
 }
@@ -62,7 +63,9 @@ fill_metadata_from_stat(dpl_dict_t *dict,
 void
 fill_default_metadata(dpl_dict_t *dict)
 {
-        time_t t = time(NULL);
+        time_t t;
+
+        t = time(NULL);
         assign_meta_to_dict(dict, "mode", (mode_t []){umask(S_IWGRP|S_IWOTH)});
         assign_meta_to_dict(dict, "uid", (uid_t []){getuid()});
         assign_meta_to_dict(dict, "gid", (gid_t []){getgid()});
@@ -76,18 +79,22 @@ static long long
 metadatatoll(dpl_dict_t *dict,
              const char *const name)
 {
-        char *value = dpl_dict_get_value(dict, (char *)name);
+        char *value = NULL;
+        long long v = 0;
+
+        value = dpl_dict_get_value(dict, (char *)name);
 
         if (! value) {
                 LOG("can't grab any meta '%s'", name);
                 return -1;
         }
 
-        long long v = strtoull(value, NULL, 10);
+        v = strtoull(value, NULL, 10);
         if (0 == strcmp(name, "mode"))
                 LOG("meta=%s, value=0x%x", name, (unsigned)v);
         else
                 LOG("meta=%s, value=%s", name, value);
+
         return v;
 }
 

@@ -5,7 +5,9 @@
 struct pentry *
 pentry_new(void)
 {
-        struct pentry *pe = malloc(sizeof *pe);
+        struct pentry *pe = NULL;
+
+        pe = malloc(sizeof *pe);
         if (! pe) {
                 LOG("out of memory");
                 exit(EXIT_FAILURE);
@@ -50,8 +52,5 @@ pentry_cmp_callback(gpointer key,
                     gpointer value,
                     gpointer data)
 {
-        char *value_path = (char *)value;
-        char *data_path = (char *)data;
-
-        return strcmp(value_path, data_path);
+        return strcmp((char *)value, (char *)data);
 }

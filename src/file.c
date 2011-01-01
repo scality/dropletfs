@@ -86,10 +86,13 @@ cb_get_buffered(void *arg,
                 char *buf,
                 unsigned len)
 {
-        struct get_data *get_data = arg;
         dpl_status_t ret = DPL_SUCCESS;
+        struct get_data *get_data = NULL;
+
+        get_data = arg;
 
         ret = write_all(get_data->fd, buf, len);
+
         if (DPL_SUCCESS != ret)
                 return -1;
 
@@ -108,26 +111,29 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
         LOG("entering... remote=%s, info->fh=%d", remote, fd);
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
-        dpl_status_t ret = DPL_FAILURE;
+        dpl_status_t rc = DPL_FAILURE;
+        char *s = NULL;
+        unsigned long size = 0;
+
         if (-1 == fd) {
                 LOG("invalid fd");
                 return;
         }
 
-        char *s = dpl_dict_get_value(dict, "size");
-        unsigned long size = s ? strtoul(s, NULL, 10) : 0;
+        s = dpl_dict_get_value(dict, "size");
+        size = s ? strtoul(s, NULL, 10) : 0;
         LOG("size=%lu", size);
 
-        ret = dpl_openwrite(ctx,
-                            (char *)remote,
-                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                            dict,
-                            canned_acl,
-                            size,
-                            &vfile);
+        rc = dpl_openwrite(ctx,
+                           (char *)remote,
+                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
+                           dict,
+                           canned_acl,
+                           size,
+                           &vfile);
 
-        if (DPL_SUCCESS != ret) {
-                LOG("dpl_openwrite: %s (%d)", dpl_status_str(ret), ret);
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_openwrite: %s", dpl_status_str(rc));
                 goto err;
         }
 
@@ -148,9 +154,9 @@ dfs_md5cmp(dpl_ctx_t *ctx,
         dpl_dict_t *dict = NULL;
         char *remote_md5 = NULL;
         int diff = 1;
-        dpl_status_t rc;
-
+        dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
+
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
 
         if (DPL_ENOENT == rc)
@@ -208,9 +214,10 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
 {
         dpl_dict_t *metadata = NULL;
         struct get_data get_data = { .fd = -1, .buf = NULL };
+        dpl_status_t rc = DPL_FAILURE;
+        char *local = NULL;
 
-        char *local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
-
+        local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
 
         /* If the remote MD5 matches a cache file, we don't have to download
@@ -230,17 +237,16 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                 return -1;
         }
 
-        dpl_status_t rc = dpl_openread(ctx,
-                                       (char *)remote,
-                                       0u, /* no encryption */
-                                       NULL,
-                                       cb_get_buffered,
-                                       &get_data,
-                                       &metadata);
+        rc = dpl_openread(ctx,
+                          (char *)remote,
+                          0u, /* no encryption */
+                          NULL,
+                          cb_get_buffered,
+                          &get_data,
+                          &metadata);
 
         if (DPL_SUCCESS != rc) {
-                LOG("fd=%d, status: %s (%d)",
-                    get_data.fd, dpl_status_str(rc), rc);
+                LOG("dpl_openread: %s", dpl_status_str(rc));
                 close(get_data.fd);
                 return -1;
         }

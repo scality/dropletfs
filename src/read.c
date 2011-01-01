@@ -15,8 +15,10 @@ dfs_read(const char *path,
          off_t offset,
          struct fuse_file_info *info)
 {
-        int ret = -1;
-        int fd = ((struct pentry *)info->fh)->fd;
+        int ret = 0;
+        int fd = 0;
+
+        fd = ((struct pentry *)info->fh)->fd;
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, fd);
 

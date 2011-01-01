@@ -11,23 +11,24 @@ dfs_readdir(const char *path,
             off_t offset,
             struct fuse_file_info *info)
 {
+        void *dir_hdl;
+        dpl_dirent_t dirent;
+        dpl_status_t rc = DPL_FAILURE;
+
         LOG("path=%s, data=%p, fill=%p, offset=%lld, info=%p",
             path, data, (void *)fill, (long long)offset, (void *)info);
 
-        void *dir_hdl;
-        dpl_dirent_t dirent;
-
-        dpl_status_t rc = dpl_chdir(ctx, (char *)path);
+        rc = dpl_chdir(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_chdir failed: %s", dpl_status_str(rc));
+                LOG("dpl_chdir: %s", dpl_status_str(rc));
                 return rc;
         }
 
         rc = dpl_opendir(ctx, ".", &dir_hdl);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_opendir failed: %s", dpl_status_str(rc));
+                LOG("dpl_opendir: %s", dpl_status_str(rc));
                 return rc;
         }
 

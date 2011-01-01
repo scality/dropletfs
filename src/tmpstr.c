@@ -24,8 +24,10 @@ tmpstr_new(void)
 char *
 tmpstr_printf(char const *fmt, ...)
 {
-        char *buf = tmpstr_new();
+        char *buf = NULL;
         va_list ap;
+
+        buf = tmpstr_new();
         va_start(ap, fmt);
         vsnprintf(buf, TMPSTR_MAX, fmt, ap);
         va_end(ap);

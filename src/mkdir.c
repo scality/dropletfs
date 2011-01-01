@@ -8,12 +8,14 @@ int
 dfs_mkdir(const char *path,
           mode_t mode)
 {
+        dpl_status_t rc = DPL_FAILURE;
+
         LOG("path=%s, mode=0x%x", path, (int)mode);
 
-        dpl_status_t rc = dpl_mkdir(ctx, (char *)path);
+        rc = dpl_mkdir(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_mkdir failed: %s", dpl_status_str(rc));
+                LOG("dpl_mkdir: %s", dpl_status_str(rc));
                 return rc;
         }
 

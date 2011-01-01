@@ -32,11 +32,13 @@ int
 dfs_getattr(const char *path,
             struct stat *st)
 {
-        LOG("path=%s, st=%p", path, (void *)st);
+        dpl_ftype_t type;
+        dpl_ino_t ino, parent_ino, obj_ino;
+        dpl_status_t rc;
+        dpl_dict_t *metadata = NULL;
 
         memset(st, 0, sizeof *st);
-
-        dpl_dict_t *metadata = NULL;
+        LOG("path=%s, st=%p", path, (void *)st);
 
         /*
          * why setting st_nlink to 1?
@@ -50,25 +52,22 @@ dfs_getattr(const char *path,
                 return 0;
 	}
 
-        dpl_ftype_t type;
-        dpl_ino_t ino, parent_ino, obj_ino;
-        dpl_status_t rc;
-
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
         rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                        ino, &parent_ino, &obj_ino, &type);
 
-        LOG("dpl_namei returned %s (%d), type=%s, parent_ino=%s, obj_ino=%s",
-            dpl_status_str(rc), rc, dfs_ftypetostr(type),
+        LOG("dpl_namei returned %s, type=%s, parent_ino=%s, obj_ino=%s",
+            dpl_status_str(rc), dfs_ftypetostr(type),
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc)
                 return rc;
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
+
         if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                LOG("dpl_getattr %s: %s", path, dpl_status_str(rc));
+                LOG("dpl_getattr: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);
                 return -1;

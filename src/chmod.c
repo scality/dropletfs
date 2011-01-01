@@ -9,11 +9,12 @@ int
 dfs_chmod(const char *path,
           mode_t mode)
 {
+        dpl_dict_t *metadata = NULL;
+        dpl_status_t rc = DPL_FAILURE;
+
         LOG("%s", path);
 
-        dpl_dict_t *metadata = NULL;
-
-        dpl_status_t rc = dpl_getattr(ctx, (char *)path, &metadata);
+        rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_FAILURE == rc)
                 goto failure;

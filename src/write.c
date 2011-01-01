@@ -13,8 +13,10 @@ dfs_write(const char *path,
           off_t offset,
           struct fuse_file_info *info)
 {
-        struct pentry *pe = (struct pentry *)info->fh;
+        struct pentry *pe = NULL;
         int ret = 0;
+
+        pe = (struct pentry *)info->fh;
 
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, pe->fd);

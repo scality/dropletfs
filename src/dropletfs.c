@@ -332,11 +332,12 @@ main(int argc, char **argv)
         root_mode = 0;
         debug = 0;
         hash = NULL;
+        char *bucket = NULL;
+        dpl_status_t rc = DPL_FAILURE;
+        char *cache_dir = NULL;
 
         atexit(atexit_callback);
 
-        int rc = EXIT_FAILURE;
-        char *bucket = NULL;
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
         fp = fopen("/tmp/fuse.log", "a");
         if (! fp) {
@@ -360,9 +361,9 @@ main(int argc, char **argv)
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
-	dpl_status_t st = dpl_init();
-	if (DPL_SUCCESS != st) {
-		fprintf(fp, "dpl_init: %s\n", dpl_status_str(st));
+	rc = dpl_init();
+	if (DPL_SUCCESS != rc) {
+		fprintf(fp, "dpl_init: %s\n", dpl_status_str(rc));
                 goto err1;
 	}
 
@@ -374,7 +375,7 @@ main(int argc, char **argv)
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
-        char *cache_dir = tmpstr_printf("/tmp/%s", ctx->cur_bucket);
+        cache_dir = tmpstr_printf("/tmp/%s", ctx->cur_bucket);
         if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
                 LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
                 goto err3;

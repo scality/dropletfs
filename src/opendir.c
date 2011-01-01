@@ -8,12 +8,14 @@ int
 dfs_opendir(const char *path,
             struct fuse_file_info *info)
 {
+        dpl_status_t rc = DPL_FAILURE;
+
         LOG("path=%s, info=%p", path, (void *)info);
 
-        dpl_status_t rc = dpl_opendir(ctx, (char *)path, (void *[]){NULL});
+        rc = dpl_opendir(ctx, (char *)path, (void *[]){NULL});
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_opendir failed: %s", dpl_status_str(rc));
+                LOG("dpl_opendir: %s", dpl_status_str(rc));
                 return rc;
         }
 
