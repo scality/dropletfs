@@ -49,6 +49,11 @@ dplfs: $(OBJ)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+clear:
+	@echo -n "removing the trailing spaces in source files... "
+	@find . -name \*.h -o -name \*.c -exec sed -i 's:\s\+$$::g' {} \;
+	@echo "done"
+
 clean:
 	rm -f $(OBJ) *~ $(bin)
 	rm -f bin/*
