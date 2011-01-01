@@ -3,6 +3,9 @@
 
 #include "tmpstr.h"
 
+int vsnprintf(char *, size_t, const char *, va_list);
+
+
 #define TMPSTR_MAX  2048
 #define TMPSTR_NB 32
 

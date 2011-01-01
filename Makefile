@@ -13,7 +13,22 @@ GLIB_LDFLAGS=$(shell pkg-config --libs glib-2.0)
 
 CPPFLAGS+=
 LDFLAGS+=-ldroplet -lssl -lxml2 $(FUSE_LDFLAGS) $(GLIB_LDFLAGS) -L$(DPL_LIB_DIR)
-CFLAGS+=-g -ggdb3 -O0 $(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
+
+CFLAGS+=-Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+CFLAGS+=-Wno-unused-parameter
+CFLAGS+=-Wall -Wextra -Werror
+CFLAGS+=-Wformat-nonliteral -Wcast-align -Wpointer-arith
+CFLAGS+=-Wbad-function-cast -Wmissing-prototypes -Wstrict-prototypes
+CFLAGS+=-Wmissing-declarations
+CFLAGS+=-Winline -Wundef -Wnested-externs
+# CFLAGS+=-Wcast-qual
+# CFLAGS+=-Wshadow
+CFLAGS+=-Wconversion
+# CFLAGS+=-Wwrite-strings
+CFLAGS+=-Wno-conversion -Wfloat-equal -Wuninitialized
+CFLAGS+=-g -ggdb3 -O0
+
+CFLAGS+=$(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
 
 SRC=$(wildcard src/*.c)
 OBJ= $(SRC:.c=.o)
@@ -26,8 +41,8 @@ CC=/usr/bin/gcc
 
 all: $(bin)
 
+# since git can't add an empty dir (see the git faq), let's do it there...
 dplfs: $(OBJ)
-	# since git can't add an empty dir (see the git faq), let's do it there...
 	mkdir -p bin
 	$(CC) -o bin/$@ $^ $(LDFLAGS)
 
@@ -36,7 +51,7 @@ dplfs: $(OBJ)
 
 clean:
 	rm -f $(OBJ) *~ $(bin)
-	rm -f bin/$(bin)
+	rm -f bin/*
 
 uninstall:
 	rm -f $(DEST)/$(bin)

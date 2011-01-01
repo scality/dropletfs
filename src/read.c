@@ -1,6 +1,12 @@
+#include <errno.h>
+#include <droplet.h>
 #include <unistd.h>
 
-#include "glob.h"
+#include "read.h"
+#include "hash.h"
+#include "log.h"
+
+ssize_t pread(int, void *, size_t, off_t);
 
 int
 dfs_read(const char *path,
@@ -18,7 +24,7 @@ dfs_read(const char *path,
 
         if (-1 == ret) {
                 LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
-                return -1;
+                return -errno;
         }
 
         LOG("%s - %d bytes read", path, ret);

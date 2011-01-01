@@ -1,3 +1,9 @@
+#include <unistd.h>
+#include <errno.h>
+
+#include "fsync.h"
+#include "hash.h"
+#include "log.h"
 #include "glob.h"
 
 int

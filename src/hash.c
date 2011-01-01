@@ -1,4 +1,6 @@
+#include "log.h"
 #include "hash.h"
+#include "metadata.h"
 
 struct pentry *
 pentry_new(void)
@@ -52,17 +54,4 @@ pentry_cmp_callback(gpointer key,
         char *data_path = (char *)data;
 
         return strcmp(value_path, data_path);
-}
-
-int
-get_fd_from_path(char *path)
-{
-        struct pentry *pe = g_hash_table_find(hash,
-                                              pentry_cmp_callback,
-                                              (char *)path);
-
-        if (! pe)
-                return -1;
-
-        return pe->fd;
 }

@@ -1,5 +1,10 @@
-#include "glob.h"
-#include "file.h"
+#include <errno.h>
+
+#include "log.h"
+#include "write.h"
+#include "hash.h"
+
+ssize_t pwrite(int, const void *, size_t, off_t);
 
 int
 dfs_write(const char *path,

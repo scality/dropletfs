@@ -1,4 +1,9 @@
+#include <droplet.h>
+
 #include "glob.h"
+#include "chmod.h"
+#include "log.h"
+#include "metadata.h"
 
 int
 dfs_chmod(const char *path,

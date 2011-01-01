@@ -1,3 +1,7 @@
+#include <droplet.h>
+
+#include "opendir.h"
+#include "log.h"
 #include "glob.h"
 
 int
@@ -6,9 +10,12 @@ dfs_opendir(const char *path,
 {
         LOG("path=%s, info=%p", path, (void *)info);
 
-        void *dir_hdl;
         dpl_status_t rc = dpl_opendir(ctx, (char *)path, (void *[]){NULL});
-        DPL_CHECK_ERR(dpl_opendir, rc, path);
+
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_opendir failed: %s", dpl_status_str(rc));
+                return rc;
+        }
 
         return 0;
 }

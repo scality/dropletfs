@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "misc.h"
 
 #define MKDIR(path, mode) do {                          \
         if (-1 == mkdir(path, mode) && EEXIST != errno) \

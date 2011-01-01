@@ -1,4 +1,5 @@
-#include "glob.h"
+#include "statfs.h"
+#include "log.h"
 
 int
 dfs_statfs(const char *path, struct statvfs *buf)

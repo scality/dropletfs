@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include "log.h"
 #include "metadata.h"
 #include "tmpstr.h"
 
@@ -71,7 +72,7 @@ fill_default_metadata(dpl_dict_t *dict)
 
 }
 
-long long
+static long long
 metadatatoll(dpl_dict_t *dict,
              const char *const name)
 {

@@ -1,4 +1,8 @@
+#include <droplet.h>
+
+#include "mknod.h"
 #include "glob.h"
+#include "log.h"
 
 int
 dfs_mknod(const char *path,

@@ -1,4 +1,11 @@
+#include <droplet.h>
+#include <errno.h>
+
+#include "release.h"
 #include "glob.h"
+#include "file.h"
+#include "metadata.h"
+#include "log.h"
 
 int
 dfs_release(const char *path,

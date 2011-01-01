@@ -1,7 +1,11 @@
 #ifndef DROPLET_METADATA_H
 #define DROPLET_METADATA_H
 
-#include "glob.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <droplet.h>
 
 void copy_metadata(dpl_dict_t *dst, dpl_dict_t *src);
 

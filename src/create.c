@@ -1,5 +1,14 @@
+#include <fuse.h>
+#include <droplet.h>
+#include <errno.h>
+
+#include "open.h"
+#include "create.h"
 #include "glob.h"
+#include "log.h"
 #include "file.h"
+#include "metadata.h"
+#include "hash.h"
 
 int
 dfs_create(const char *path,

@@ -1,4 +1,11 @@
+#include <droplet.h>
+
+#include "unlink.h"
 #include "file.h"
+#include "log.h"
+#include "glob.h"
+
+#include "rename.h"
 
 int
 dfs_rename(const char *oldpath,

@@ -1,5 +1,10 @@
 #include <libgen.h>
+#include <unistd.h>
+#include <errno.h>
 
+#include "glob.h"
+#include "misc.h"
+#include "log.h"
 #include "file.h"
 #include "tmpstr.h"
 
@@ -135,8 +140,7 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
                 dpl_close(vfile);
 }
 
-
-int
+static int
 dfs_md5cmp(dpl_ctx_t *ctx,
            const char *const md5,
            char *path)
@@ -246,7 +250,6 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
                 dpl_dict_free(metadata);
         }
 
-err:
         fsync(get_data.fd);
         return get_data.fd;
 }

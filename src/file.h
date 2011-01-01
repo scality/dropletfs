@@ -1,9 +1,10 @@
 #ifndef DROPLET_FILE_H
 #define DROPLET_FILE_H
 
-#include "glob.h"
+#include <droplet.h>
+#include <fuse.h>
 
-
+#include "hash.h"
 
 struct get_data {
         struct buf *buf;

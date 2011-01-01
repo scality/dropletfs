@@ -1,10 +1,11 @@
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <libgen.h>
+#include <droplet.h>
 
+#include "getattr.h"
 #include "glob.h"
+#include "log.h"
 #include "file.h"
+#include "metadata.h"
 
 static void
 set_default_stat(struct stat *st, dpl_ftype_t type)

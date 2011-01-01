@@ -1,3 +1,7 @@
+#include <errno.h>
+
+#include "open.h"
+#include "log.h"
 #include "glob.h"
 #include "file.h"
 #include "tmpstr.h"

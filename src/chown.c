@@ -1,4 +1,9 @@
+#include <droplet.h>
+
 #include "glob.h"
+#include "chown.h"
+#include "log.h"
+#include "metadata.h"
 
 int
 dfs_chown(const char *path,

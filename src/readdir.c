@@ -1,15 +1,8 @@
+#include <droplet.h>
+
+#include "readdir.h"
 #include "glob.h"
-
-
-static int
-fuse_filler(void *buf,
-            const char *name,
-            const struct stat *stbuf,
-            off_t off)
-{
-        return 0;
-}
-
+#include "log.h"
 
 int
 dfs_readdir(const char *path,
@@ -25,10 +18,18 @@ dfs_readdir(const char *path,
         dpl_dirent_t dirent;
 
         dpl_status_t rc = dpl_chdir(ctx, (char *)path);
-        DPL_CHECK_ERR(dpl_chdir, rc, path);
+
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_chdir failed: %s", dpl_status_str(rc));
+                return rc;
+        }
 
         rc = dpl_opendir(ctx, ".", &dir_hdl);
-        DPL_CHECK_ERR(dpl_opendir, rc, ".");
+
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_opendir failed: %s", dpl_status_str(rc));
+                return rc;
+        }
 
         while (DPL_SUCCESS == dpl_readdir(dir_hdl, &dirent)) {
                 if (0 != fill(data, dirent.name, NULL, 0))

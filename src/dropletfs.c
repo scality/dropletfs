@@ -10,8 +10,32 @@
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
 
+#include "hash.h"
 #include "tmpstr.h"
+#include "log.h"
 #include "glob.h"
+
+#include "open.h"
+#include "create.h"
+#include "statfs.h"
+#include "mknod.h"
+#include "read.h"
+#include "write.h"
+#include "release.h"
+#include "unlink.h"
+
+#include "getattr.h"
+#include "setxattr.h"
+
+#include "opendir.h"
+#include "mkdir.h"
+#include "readdir.h"
+#include "rmdir.h"
+
+#include "fsync.h"
+#include "rename.h"
+#include "chmod.h"
+#include "chown.h"
 
 
 dpl_ctx_t *ctx = NULL;
@@ -27,18 +51,6 @@ atexit_callback(void)
                 g_hash_table_remove_all(hash);
 	dpl_free();
 }
-
-
-
-static void
-display_attribute(dpl_var_t *var,
-                  void *arg)
-{
-        LOG("attribute for object %s: %s=%s",
-            (char *)arg, var->key, var->value);
-}
-
-
 
 
 
@@ -160,15 +172,6 @@ dfs_ftruncate(const char *path,
 }
 
 static int
-dfs_fgetattr(const char *path,
-             struct stat *buf,
-             struct fuse_file_info *info)
-{
-        LOG("%s", path);
-        return 0;
-}
-
-static int
 dfs_lock(const char *path,
          struct fuse_file_info *info,
          int cmd,
@@ -249,11 +252,11 @@ struct fuse_operations dfs_ops = {
         .truncate   = dfs_truncate,
         .utime      = dfs_utime,
         .flush      = dfs_flush,
-        .setxattr   = dfs_setxattr,
         .fsyncdir   = dfs_fsyncdir,
         .init       = dfs_init,
         .destroy    = dfs_destroy,
         .access     = dfs_access,
+        .releasedir = dfs_releasedir,
         .ftruncate  = dfs_ftruncate,
         .lock       = dfs_lock,
         .utimens    = dfs_utimens,
