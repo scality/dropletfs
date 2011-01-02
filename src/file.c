@@ -102,8 +102,7 @@ cb_get_buffered(void *arg,
 
 
 void
-dfs_put_local_copy(dpl_ctx_t *ctx,
-                   dpl_dict_t *dict,
+dfs_put_local_copy(dpl_dict_t *dict,
                    struct fuse_file_info *info,
                    const char *remote)
 {
@@ -147,8 +146,7 @@ dfs_put_local_copy(dpl_ctx_t *ctx,
 }
 
 static int
-dfs_md5cmp(dpl_ctx_t *ctx,
-           const char *const md5,
+dfs_md5cmp(const char *const md5,
            char *path)
 {
         dpl_dict_t *dict = NULL;
@@ -168,7 +166,7 @@ dfs_md5cmp(dpl_ctx_t *ctx,
                 goto err;
 
         if (dict)
-                remote_md5 = dpl_dict_get_value(dict, "md5");
+                remote_md5 = dpl_dict_get_value(dict, "Etag");
 
         if (remote_md5)
                 diff = strncmp(md5, remote_md5, MD5_DIGEST_LENGTH);
@@ -208,8 +206,7 @@ build_cache_tree(const char *path)
 
 /* return the fd of a local copy, to operate on */
 int
-dfs_get_local_copy(dpl_ctx_t *ctx,
-                   struct pentry *pe,
+dfs_get_local_copy(struct pentry *pe,
                    const char *remote)
 {
         dpl_dict_t *metadata = NULL;
@@ -223,7 +220,7 @@ dfs_get_local_copy(dpl_ctx_t *ctx,
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(ctx, pe->digest, (char *)remote))
+        if (0 == dfs_md5cmp(pe->digest, (char *)remote))
                 return pe->fd;
 
         /* a cache file already exist, its MD5 digest is different, so...

@@ -21,10 +21,10 @@ int cb_get_buffered(void *, char *, unsigned);
 
 char *build_cache_tree(const char *);
 
-void dfs_put_local_copy(dpl_ctx_t *, dpl_dict_t *, struct fuse_file_info *, const char *);
+void dfs_put_local_copy(dpl_dict_t *, struct fuse_file_info *, const char *);
 
 /* return the fd of a local copy, to operate on */
-int dfs_get_local_copy(dpl_ctx_t *, struct pentry *pe, const char *);
+int dfs_get_local_copy(struct pentry *pe, const char *);
 
 
 #endif

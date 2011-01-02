@@ -46,7 +46,7 @@ dfs_open(const char *path,
         } else {
                 /* otherwise we simply want to read the file */
                 if (-1 == pe->fd)
-                        pe->fd = dfs_get_local_copy(ctx, pe, path);
+                        pe->fd = dfs_get_local_copy(pe, path);
         }
 
   err:
