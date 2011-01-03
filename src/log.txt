@@ -1,0 +1,26 @@
+fuse: bad mount point `/tmp/amazon/': Transport endpoint is not connected
+n_conn_buckets: 1021
+n_conn_max: 900
+n_conn_max_hits: 50
+conn_idle_time: 100
+conn_timeout: 5
+read_timeout: 30
+write_timeout: 30
+use_https: 0
+host: s3.amazonaws.com
+port: 80
+access_key: AKIAJ62Q55NNID6MY6QQ
+secret_key: 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
+ssl_cert_file: /home/poz/.droplet/client.pem
+ssl_key_file: /home/poz/.droplet/client.key
+ssl_password: foobar
+ssl_ca_list: (null)
+trace_level: -1
+pricing: AWS_US-Standard_Storage
+read_buf_size: 8192
+encrypt_key: hello
+delim: /
+n_conn_fds: 0
+cur_bucket: poz
+droplet_dir: /home/poz/.droplet
+profile_name: default
