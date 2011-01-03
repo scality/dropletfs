@@ -54,7 +54,7 @@ dfs_release(const char *path,
 
   err:
         if (-1 != pe->fd)
-                close(pe->fd);
+                lseek(pe->fd, SEEK_SET, 0);
 
         if (dict)
                 dpl_dict_free(dict);

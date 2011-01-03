@@ -19,8 +19,11 @@ dfs_open(const char *path,
 
         pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
         if (! pe) {
+                LOG("'%s': entry not found in hashtable", path);
                 pe = pentry_new();
                 pentry_set_fd(pe, -1);
+        } else {
+                LOG("'%s': found in the hashtable, fd=%d", path, pe->fd);
         }
 
         info->fh = (uint64_t)pe;
@@ -42,13 +45,13 @@ dfs_open(const char *path,
                         LOG("%s: %s", file, strerror(errno));
                         goto err;
                 }
-                g_hash_table_insert(hash, (char *)path, pe);
         } else {
                 /* otherwise we simply want to read the file */
                 if (-1 == pe->fd)
                         pe->fd = dfs_get_local_copy(pe, path);
         }
 
+        g_hash_table_insert(hash, (char *)path, pe);
   err:
         LOG("@pentry=%p, fd=%d, flags=0x%X", pe, pe->fd, info->flags);
         return 0;

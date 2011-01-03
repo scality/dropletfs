@@ -21,6 +21,8 @@ void pentry_set_fd(struct pentry *, int);
 
 void pentry_set_metadata(struct pentry *, dpl_dict_t *);
 
+void pentry_set_digest(struct pentry *, const char *);
+
 void pentry_ctor(struct pentry *, int, dpl_dict_t *);
 
 gboolean pentry_cmp_callback(gpointer, gpointer, gpointer);

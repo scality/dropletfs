@@ -7,6 +7,7 @@
 #include "log.h"
 #include "file.h"
 #include "tmpstr.h"
+#include "metadata.h"
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -146,7 +147,7 @@ dfs_put_local_copy(dpl_dict_t *dict,
 }
 
 static int
-dfs_md5cmp(const char *const md5,
+dfs_md5cmp(struct pentry *pe,
            char *path)
 {
         dpl_dict_t *dict = NULL;
@@ -160,16 +161,25 @@ dfs_md5cmp(const char *const md5,
         if (DPL_ENOENT == rc)
                 return diff;
 
-        rc = dpl_head(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
+        rc = dpl_head_all_headers(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
+        print_metadata(dict);
 
         if (DPL_SUCCESS != rc)
                 goto err;
 
-        if (dict)
-                remote_md5 = dpl_dict_get_value(dict, "Etag");
 
-        if (remote_md5)
-                diff = strncmp(md5, remote_md5, MD5_DIGEST_LENGTH);
+        if (dict)
+                remote_md5 = dpl_dict_get_value(dict, "etag");
+
+        if (remote_md5) {
+                LOG("remote md5=%s", remote_md5);
+                LOG("local md5=%.*s", MD5_DIGEST_LENGTH, pe->digest);
+                diff = strncasecmp(pe->digest, remote_md5, MD5_DIGEST_LENGTH);
+                if (diff) {
+                        pentry_set_digest(pe, remote_md5);
+                        LOG("[updated] local md5=%s", pe->digest);
+                }
+        }
 
   err:
         if (dict)
@@ -220,7 +230,7 @@ dfs_get_local_copy(struct pentry *pe,
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(pe->digest, (char *)remote))
+        if (0 == dfs_md5cmp(pe, (char *)remote))
                 return pe->fd;
 
         /* a cache file already exist, its MD5 digest is different, so...

@@ -6,22 +6,19 @@
 
 
 static void
-cb_var_copy(dpl_var_t *var,
-            void *arg)
+cb_var_print(dpl_var_t *var,
+             void *arg)
 {
-        dpl_dict_add((dpl_dict_t *)arg, var->key, var->value, 0);
+        (void)arg;
+        LOG("var=%s, value=%s", var->key, var->value);
 }
 
 void
-copy_metadata(dpl_dict_t *dst, dpl_dict_t *src)
+print_metadata(dpl_dict_t *dict)
 {
-        assert(dst);
-
-        if (src)
-                dpl_dict_iterate(src, cb_var_copy, dst);
-        else
-                dpl_dict_free(dst);
+        dpl_dict_iterate(dict, cb_var_print, NULL);
 }
+
 
 void
 assign_meta_to_dict(dpl_dict_t *dict,

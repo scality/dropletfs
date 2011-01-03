@@ -13,6 +13,7 @@ dfs_unlink(const char *path)
 {
         dpl_status_t rc = DPL_FAILURE;
         char local[4096] = "";
+        struct pentry * pe = NULL;
 
         LOG("path=%s", path);
 
@@ -27,7 +28,11 @@ dfs_unlink(const char *path)
         if (-1 == unlink(local))
                 LOG("unlink cache file (%s): %s", local, strerror(errno));
 
-        g_hash_table_remove(hash, (char *)path);
+        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        if (pe) {
+                pentry_free(pe);
+                g_hash_table_remove(hash, (char *)path);
+        }
 
         return 0;
 }
