@@ -21,9 +21,6 @@ pentry_new(void)
 void
 pentry_free(struct pentry *pe)
 {
-        if (pe->digest)
-                free(pe->digest);
-
         if (-1 != pe->fd)
                 close(pe->fd);
 
