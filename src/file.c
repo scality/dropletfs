@@ -161,7 +161,7 @@ dfs_md5cmp(struct pentry *pe,
         if (DPL_ENOENT == rc)
                 return diff;
 
-        rc = dpl_head_all_headers(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
+        rc = dpl_head_all(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
         print_metadata(dict);
 
         if (DPL_SUCCESS != rc)
