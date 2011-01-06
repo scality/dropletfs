@@ -58,11 +58,3 @@ pentry_ctor(struct pentry *pe,
         pentry_set_fd(pe, fd);
         pentry_set_metadata(pe, meta);
 }
-
-gboolean
-pentry_cmp_callback(gpointer key,
-                    gpointer value,
-                    gpointer data)
-{
-        return strcmp((char *)value, (char *)data);
-}

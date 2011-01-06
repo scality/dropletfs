@@ -28,7 +28,7 @@ dfs_unlink(const char *path)
         if (-1 == unlink(local))
                 LOG("unlink cache file (%s): %s", local, strerror(errno));
 
-        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        pe = g_hash_table_lookup(hash, path);
         if (pe) {
                 pentry_free(pe);
                 g_hash_table_remove(hash, (char *)path);

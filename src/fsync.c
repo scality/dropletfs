@@ -15,7 +15,7 @@ dfs_fsync(const char *path,
 
         LOG("%s", path);
 
-        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        pe = g_hash_table_lookup(hash, path);
 
         if (pe && -1 != pe->fd) {
                 if (! issync && -1 == fsync(pe->fd)) {

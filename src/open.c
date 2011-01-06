@@ -17,7 +17,7 @@ dfs_open(const char *path,
         LOG("%s", path);
         PRINT_FLAGS(path, info);
 
-        pe = g_hash_table_find(hash, pentry_cmp_callback, (char *)path);
+        pe = g_hash_table_lookup(hash, path);
         if (! pe) {
                 LOG("'%s': entry not found in hashtable", path);
                 pe = pentry_new();
