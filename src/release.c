@@ -26,17 +26,26 @@ dfs_release(const char *path,
         char *zlocal = NULL;
         char zlib_level_str[32];
         size_t size;
+        int fd = -1;
+        FILE *fpsrc = NULL;
+        FILE *fpdst = NULL;
 
         pe = (struct pentry *)info->fh;
         if (! pe)
                 return 0;
 
-        LOG("%s, fd=%d", path, pe->fd);
+        fd = pe->fd;
+        LOG("%s, fd=%d", path, fd);
 
         if (-1 == fstat(pe->fd, &st)) {
-                LOG("fstat(%d, %p) = %s", pe->fd, (void *)&st, strerror(errno));
+                LOG("fstat(%d, %p) = %s", fd, (void *)&st, strerror(errno));
                 goto err;
         }
+
+        /* We opened a file but we do not want to update it on the server since
+         * it was only for read-only purposes */
+        if (O_RDONLY == (info->flags & O_ACCMODE))
+                goto err;
 
         size = st.st_size;
 
@@ -47,20 +56,48 @@ dfs_release(const char *path,
         dict = dpl_dict_new(13);
         fill_metadata_from_stat(dict, &st);
 
-        ret = zip(local, zlocal, zlib_level);
-        if (Z_OK == ret) {
-                rc = dpl_dict_update_value(dict, "compression", "zlib");
-                if (DPL_SUCCESS != rc) {
-                        LOG("can't update metadata: %s", dpl_status_str(rc));
-                        goto send;
-                }
+        fpsrc = fopen(local, "r");
+        if (! fpsrc) {
+                LOG("fopen: %s", strerror(errno));
+                goto err;
+        }
 
+        fpdst = fopen(zlocal, "w");
+        if (! fpdst) {
+                LOG("fopen: %s", strerror(errno));
+                LOG("send the file uncompressed");
+                goto send;
+        }
+
+        LOG("start compression before upload");
+        ret = zip(fpsrc, fpdst, zlib_level);
+        if (Z_OK != ret) {
+                LOG("zip failed: %s", zerr_to_str(ret));
+                goto err;
+        }
+
+        fd = fileno(fpdst);
+        if (-1 == fd) {
+                LOG("fileno: %s", strerror(errno));
+                fd = pe->fd;
+                goto send;
+        } else {
+                /* please rewind before sending the data */
+                LOG("fd of compressed file: %d", fd);
+                lseek(fd, 0, SEEK_SET);
+        }
+
+        rc = dpl_dict_update_value(dict, "compression", "zlib");
+        if (DPL_SUCCESS != rc) {
+                LOG("can't update metadata: %s", dpl_status_str(rc));
+        } else {
                 struct stat zst;
-                if (-1 == stat(zlocal, &zst)) {
-                        LOG("stat: %s", strerror(errno));
+                if (-1 == fstat(fd, &zst)) {
+                        LOG("fstat: %s", strerror(errno));
                         goto err;
                 }
                 size = zst.st_size;
+                LOG("compression done: %zuB -> %zuB", st.st_size, zst.st_size);
         }
 
   send:
@@ -72,18 +109,25 @@ dfs_release(const char *path,
                            size,
                            &vfile);
 
+
         if (DPL_SUCCESS != rc) {
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
                 ret = -1;
                 goto err;
         }
 
-        if (-1 == read_all(pe->fd, vfile)) {
+        if (-1 == read_all(fd, vfile)) {
                 ret = -1;
                 goto err;
         }
 
   err:
+        if (fpsrc)
+                fclose(fpsrc);
+
+        if (fpdst)
+                fclose(fpdst);
+
         if (-1 != pe->fd)
                 lseek(pe->fd, SEEK_SET, 0);
 
@@ -93,8 +137,8 @@ dfs_release(const char *path,
         if (vfile)
                 dpl_close(vfile);
 
-        if (-1 == unlink(zlocal))
-                LOG("unlink: %s", strerror(errno));
+/*         if (zlocal && -1 == unlink(zlocal)) */
+/*                 LOG("unlink: %s", strerror(errno)); */
 
         return ret;
 }

@@ -176,11 +176,11 @@ dfs_md5cmp(struct pentry *pe,
 
         if (remote_md5) {
                 LOG("remote md5=%s", remote_md5);
-                LOG("local md5=%.*s", MD5_DIGEST_LENGTH, pe->digest);
+                LOG("local md5=\"%.*s\"", MD5_DIGEST_LENGTH, pe->digest);
                 diff = strncasecmp(pe->digest, remote_md5, MD5_DIGEST_LENGTH);
                 if (diff) {
                         pentry_set_digest(pe, remote_md5);
-                        LOG("[updated] local md5=%s", pe->digest);
+                        LOG("[updated] local md5=\"%s\"", pe->digest);
                 }
         }
 
@@ -227,6 +227,8 @@ dfs_get_local_copy(struct pentry *pe,
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
         char *compressed = NULL;
+        FILE *fpsrc = NULL;
+        FILE *fpdst = NULL;
 
         local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
@@ -266,15 +268,25 @@ dfs_get_local_copy(struct pentry *pe,
         /* If the file is compressed, uncompress it! */
 #define ZLIB "zlib"
         compressed = dpl_dict_get_value(metadata, "compression");
-        if (! compressed)
+        if (! compressed) {
+                LOG("%s: uncompressed remote file", remote);
                 goto end;
+        }
 
         if (!strncmp(compressed, ZLIB, strlen(ZLIB))) {
                 char *uzlocal = NULL;
+                int zret;
 
+                fpsrc = fopen(local, "r");
+                fpdst = fopen(uzlocal, "w");
                 uzlocal = tmpstr_printf("%s.tmp", local);
-                if (Z_OK != unzip(local, uzlocal))
+                LOG("uncompressing local file '%s'", local);
+                zret = unzip(fpsrc, fpdst);
+/*                 zret = unzip(local, uzlocal); */
+                if (Z_OK != zret) {
+                        LOG("unzip failed: %s", zerr_to_str(zret));
                         goto end;
+                }
 
                 rc = dpl_dict_update_value(metadata, "compression", "none");
                 if (DPL_SUCCESS != rc) {
@@ -300,6 +312,12 @@ dfs_get_local_copy(struct pentry *pe,
                 pentry_set_metadata(pe, metadata);
                 dpl_dict_free(metadata);
         }
+
+        if (fpsrc)
+                fclose(fpsrc);
+
+        if (fpdst)
+                fclose(fpdst);
 
         return get_data.fd;
 }
