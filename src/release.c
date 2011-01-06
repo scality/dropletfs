@@ -21,10 +21,10 @@ dfs_release(const char *path,
         dpl_status_t rc = DPL_FAILURE;
         dpl_dict_t *dict = NULL;
         struct stat st;
+        struct stat zst;
         int ret = 0;
         char *local = NULL;
         char *zlocal = NULL;
-        char zlib_level_str[32];
         size_t size;
         int fd = -1;
         FILE *fpsrc = NULL;
@@ -51,7 +51,6 @@ dfs_release(const char *path,
 
         local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
         zlocal = tmpstr_printf("%s.tmp", local);
-        snprintf(zlib_level_str, sizeof zlib_level_str, "%lu", zlib_level);
 
         dict = dpl_dict_new(13);
         fill_metadata_from_stat(dict, &st);
@@ -62,7 +61,7 @@ dfs_release(const char *path,
                 goto err;
         }
 
-        fpdst = fopen(zlocal, "w");
+        fpdst = fopen(zlocal, "w+");
         if (! fpdst) {
                 LOG("fopen: %s", strerror(errno));
                 LOG("send the file uncompressed");
@@ -76,29 +75,29 @@ dfs_release(const char *path,
                 goto err;
         }
 
+        fflush(fpdst);
         fd = fileno(fpdst);
         if (-1 == fd) {
                 LOG("fileno: %s", strerror(errno));
+                LOG("send the file uncompressed");
                 fd = pe->fd;
                 goto send;
-        } else {
-                /* please rewind before sending the data */
-                LOG("fd of compressed file: %d", fd);
-                lseek(fd, 0, SEEK_SET);
         }
 
-        rc = dpl_dict_update_value(dict, "compression", "zlib");
-        if (DPL_SUCCESS != rc) {
-                LOG("can't update metadata: %s", dpl_status_str(rc));
-        } else {
-                struct stat zst;
-                if (-1 == fstat(fd, &zst)) {
-                        LOG("fstat: %s", strerror(errno));
-                        goto err;
-                }
-                size = zst.st_size;
-                LOG("compression done: %zuB -> %zuB", st.st_size, zst.st_size);
+        if (-1 == fstat(fd, &zst)) {
+                LOG("fstat: %s", strerror(errno));
+                goto err;
         }
+
+        /* please rewind before sending the data */
+        lseek(fd, 0, SEEK_SET);
+        LOG("compressed file: fd=%d, size=%zu", fd, zst.st_size);
+
+        rc = dpl_dict_update_value(dict, "compression", "zlib");
+        if (DPL_SUCCESS != rc)
+                LOG("can't update metadata: %s", dpl_status_str(rc));
+        else
+                size = zst.st_size;
 
   send:
         rc = dpl_openwrite(ctx,
