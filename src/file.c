@@ -61,7 +61,6 @@ read_all(int fd,
         static int blksize = 4096;
         char *buf = NULL;
 
-
         buf = alloca(blksize);
         while (1)
         {
@@ -264,7 +263,6 @@ dfs_get_local_copy(struct pentry *pe,
                 return -1;
         }
 
-
         /* If the file is compressed, uncompress it! */
 #define ZLIB "zlib"
         compressed = dpl_dict_get_value(metadata, "compression");
@@ -277,12 +275,11 @@ dfs_get_local_copy(struct pentry *pe,
                 char *uzlocal = NULL;
                 int zret;
 
+                uzlocal = tmpstr_printf("%s.tmp", local);
                 fpsrc = fopen(local, "r");
                 fpdst = fopen(uzlocal, "w");
-                uzlocal = tmpstr_printf("%s.tmp", local);
                 LOG("uncompressing local file '%s'", local);
                 zret = unzip(fpsrc, fpdst);
-/*                 zret = unzip(local, uzlocal); */
                 if (Z_OK != zret) {
                         LOG("unzip failed: %s", zerr_to_str(zret));
                         goto end;
