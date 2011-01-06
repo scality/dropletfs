@@ -38,11 +38,14 @@
 #include "chown.h"
 
 
+#define DEFAULT_ZLIB_LEVEL 3
+
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
 mode_t root_mode = 0;
 int debug = 0;
 GHashTable *hash = NULL;
+unsigned long zlib_level = DEFAULT_ZLIB_LEVEL;
 
 static void
 atexit_callback(void)
@@ -335,6 +338,7 @@ main(int argc, char **argv)
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
         char *cache_dir = NULL;
+        char *zlib_level_str = NULL;
 
         atexit(atexit_callback);
 
@@ -374,6 +378,17 @@ main(int argc, char **argv)
         ctx->trace_level = ~0;
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
+
+        zlib_level_str = getenv("DROPLETFS_ZLIB_LEVEL");
+        if (zlib_level_str) {
+                zlib_level = strtoul(zlib_level_str, NULL, 10);
+                if (ULONG_MAX == zlib_level) {
+                        zlib_level = DEFAULT_ZLIB_LEVEL;
+                        LOG("strtoul: %s", strerror(errno));
+                }
+        }
+
+        LOG("zlib compression level set to: %lu", zlib_level);
 
         cache_dir = tmpstr_printf("/tmp/%s", ctx->cur_bucket);
         if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {

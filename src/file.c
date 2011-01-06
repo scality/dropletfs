@@ -8,6 +8,9 @@
 #include "file.h"
 #include "tmpstr.h"
 #include "metadata.h"
+#include "zip.h"
+
+extern unsigned long zlib_level;
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -223,6 +226,7 @@ dfs_get_local_copy(struct pentry *pe,
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
+        char *compressed = NULL;
 
         local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
@@ -258,11 +262,44 @@ dfs_get_local_copy(struct pentry *pe,
                 return -1;
         }
 
+
+        /* If the file is compressed, uncompress it! */
+#define ZLIB "zlib"
+        compressed = dpl_dict_get_value(metadata, "compression");
+        if (! compressed)
+                goto end;
+
+        if (!strncmp(compressed, ZLIB, strlen(ZLIB))) {
+                char *uzlocal = NULL;
+
+                uzlocal = tmpstr_printf("%s.tmp", local);
+                if (Z_OK != unzip(local, uzlocal))
+                        goto end;
+
+                rc = dpl_dict_update_value(metadata, "compression", "none");
+                if (DPL_SUCCESS != rc) {
+                        LOG("unable to update 'compression' metadata");
+                        goto end;
+                }
+
+                if (-1 == rename(uzlocal, local)) {
+                        LOG("rename: %s", strerror(errno));
+                        goto end;
+                }
+
+                close(get_data.fd);
+                get_data.fd = open(local, O_RDONLY);
+                if (-1 == get_data.fd)
+                        LOG("open: %s", strerror(errno));
+
+        }
+#undef ZLIB
+
+  end:
         if (metadata) {
                 pentry_set_metadata(pe, metadata);
                 dpl_dict_free(metadata);
         }
 
-        fsync(get_data.fd);
         return get_data.fd;
 }
