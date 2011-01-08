@@ -66,9 +66,9 @@ fill_default_metadata(dpl_dict_t *dict)
         assign_meta_to_dict(dict, "mode", (mode_t []){umask(S_IWGRP|S_IWOTH)});
         assign_meta_to_dict(dict, "uid", (uid_t []){getuid()});
         assign_meta_to_dict(dict, "gid", (gid_t []){getgid()});
-        assign_meta_to_dict(dict, "atime", (time_t []){t});
-        assign_meta_to_dict(dict, "ctime", (time_t []){t});
-        assign_meta_to_dict(dict, "mtime", (time_t []){t});
+        assign_meta_to_dict(dict, "atime", &t);
+        assign_meta_to_dict(dict, "ctime", &t);
+        assign_meta_to_dict(dict, "mtime", &t);
 
 }
 

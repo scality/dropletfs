@@ -1,25 +1,36 @@
+#include <assert.h>
+
 #include "log.h"
 #include "hash.h"
 #include "metadata.h"
 
-struct pentry *
+
+/* path entry on remote storage file system */
+struct pentry {
+        int fd;
+        struct stat st;
+        char digest[MD5_DIGEST_LENGTH];
+        dpl_dict_t *metadata;
+};
+
+
+pentry_t *
 pentry_new(void)
 {
-        struct pentry *pe = NULL;
+        pentry_t *pe = NULL;
 
         pe = malloc(sizeof *pe);
         if (! pe) {
                 LOG("out of memory");
-                exit(EXIT_FAILURE);
+                return NULL;
         }
 
-        memset(pe->digest, 0, MD5_DIGEST_LENGTH);
         pe->metadata = dpl_dict_new(13);
         return pe;
 }
 
 void
-pentry_free(struct pentry *pe)
+pentry_free(pentry_t *pe)
 {
         if (-1 != pe->fd)
                 close(pe->fd);
@@ -30,31 +41,59 @@ pentry_free(struct pentry *pe)
 }
 
 void
-pentry_set_fd(struct pentry *pe,
+pentry_set_fd(pentry_t *pe,
               int fd)
 {
+        assert(pe);
+
         pe->fd = fd;
 }
 
-void
-pentry_set_metadata(struct pentry *pe,
+int
+pentry_get_fd(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->fd;
+}
+
+int
+pentry_set_metadata(pentry_t *pe,
                     dpl_dict_t *meta)
 {
-        dpl_dict_copy(pe->metadata, meta);
+        assert(pe);
+
+        if (DPL_FAILURE == dpl_dict_copy(pe->metadata, meta))
+                return -1;
+
+        return 0;
 }
 
-void
-pentry_set_digest(struct pentry *pe,
+dpl_dict_t *
+pentry_get_metadata(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->metadata;
+}
+
+int
+pentry_set_digest(pentry_t *pe,
                   const char *digest)
 {
+        assert(pe);
+
+        if (! digest)
+                return -1;
+
         memcpy(pe->digest, digest, MD5_DIGEST_LENGTH);
+        return 0;
 }
 
-void
-pentry_ctor(struct pentry *pe,
-            int fd,
-            dpl_dict_t *meta)
+char *
+pentry_get_digest(pentry_t *pe)
 {
-        pentry_set_fd(pe, fd);
-        pentry_set_metadata(pe, meta);
+        assert(pe);
+
+        return pe->digest;
 }

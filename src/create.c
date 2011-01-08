@@ -21,6 +21,8 @@ dfs_create(const char *path,
         dpl_status_t rc = DPL_FAILURE;
         struct pentry *pe = NULL;
         struct stat st;
+        int fd = -1;
+        dpl_dict_t *meta = NULL;
 
         LOG("%s, mode=0x%x", path, (unsigned)mode);
         PRINT_FLAGS(path, info);
@@ -33,7 +35,7 @@ dfs_create(const char *path,
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
         rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                                    ino, &parent, &obj, &type);
+                       ino, &parent, &obj, &type);
 
         LOG("path=%s, ino=%s, parent=%s, obj=%s, type=%s, rc=%s",
             path, ino.key, parent.key, obj.key, dfs_ftypetostr(type),
@@ -50,18 +52,28 @@ dfs_create(const char *path,
 
         (void)dfs_open(path, info);
 
-        pe = (struct pentry *)info->fh;
+        pe = (pentry_t *)info->fh;
 
-        if (-1 == fstat(pe->fd, &st)) {
+        fd = pentry_get_fd(pe);
+        if (-1 == fd)
+                goto err;
+
+        if (-1 == fstat(fd, &st)) {
                 LOG("fstat: %s", strerror(errno));
                 ret = -errno;
                 goto err;
         }
 
-        fchmod(pe->fd, mode);
+        fchmod(fd, mode);
 
-        fill_metadata_from_stat(pe->metadata, &st);
-        assign_meta_to_dict(pe->metadata, "mode", &mode);
+        meta = pentry_get_metadata(pe);
+        if (! meta) {
+                LOG("NULL metadata associated with fd=%d", fd);
+                goto err;
+        }
+
+        fill_metadata_from_stat(meta, &st);
+        assign_meta_to_dict(meta, "mode", &mode);
 
         rc = dpl_mknod(ctx, (char *)path);
 

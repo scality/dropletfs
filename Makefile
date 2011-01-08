@@ -26,7 +26,7 @@ CFLAGS+=-Winline -Wundef -Wnested-externs
 CFLAGS+=-Wconversion
 # CFLAGS+=-Wwrite-strings
 CFLAGS+=-Wno-conversion -Wfloat-equal -Wuninitialized
-CFLAGS+=-g -ggdb3 -O0
+CFLAGS+=-g -ggdb3 -O2
 
 CFLAGS+=$(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
 

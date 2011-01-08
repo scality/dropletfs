@@ -109,13 +109,16 @@ dfs_put_local_copy(dpl_dict_t *dict,
                    struct fuse_file_info *info,
                    const char *remote)
 {
-        int fd = ((struct pentry *)info->fh)->fd;
-        LOG("entering... remote=%s, info->fh=%d", remote, fd);
+        int fd = -1;
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
         char *s = NULL;
         unsigned long size = 0;
+        pentry_t *pe = (pentry_t *)info->fh;
+
+        fd = pentry_get_fd(pe);
+        LOG("entering... remote=%s, info->fh=%d", remote, fd);
 
         if (-1 == fd) {
                 LOG("invalid fd");
@@ -149,7 +152,7 @@ dfs_put_local_copy(dpl_dict_t *dict,
 }
 
 static int
-dfs_md5cmp(struct pentry *pe,
+dfs_md5cmp(pentry_t *pe,
            char *path)
 {
         dpl_dict_t *dict = NULL;
@@ -157,29 +160,38 @@ dfs_md5cmp(struct pentry *pe,
         int diff = 1;
         dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
+        char *digest = NULL;
+
+        digest = pentry_get_digest(pe);
+        if (! digest) {
+                LOG("no digest");
+                goto err;
+        }
 
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
-
-        if (DPL_ENOENT == rc)
-                return diff;
+        if (DPL_ENOENT == rc) {
+                LOG("dpl_namei: %s", dpl_status_str(rc));
+                goto err;
+        }
 
         rc = dpl_head_all(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
-        print_metadata(dict);
-
-        if (DPL_SUCCESS != rc)
+        if (DPL_SUCCESS != rc) {
+                LOG("dpl_head_all: %s", dpl_status_str(rc));
                 goto err;
+        }
 
+        print_metadata(dict);
 
         if (dict)
                 remote_md5 = dpl_dict_get_value(dict, "etag");
 
         if (remote_md5) {
                 LOG("remote md5=%s", remote_md5);
-                LOG("local md5=\"%.*s\"", MD5_DIGEST_LENGTH, pe->digest);
-                diff = strncasecmp(pe->digest, remote_md5, MD5_DIGEST_LENGTH);
+                LOG("local md5=%.*s", MD5_DIGEST_LENGTH, digest);
+                diff = strncasecmp(digest, remote_md5, MD5_DIGEST_LENGTH);
                 if (diff) {
                         pentry_set_digest(pe, remote_md5);
-                        LOG("[updated] local md5=\"%s\"", pe->digest);
+                        LOG("updated local md5=%s", pentry_get_digest(pe));
                 }
         }
 
@@ -218,7 +230,7 @@ build_cache_tree(const char *path)
 
 /* return the fd of a local copy, to operate on */
 int
-dfs_get_local_copy(struct pentry *pe,
+dfs_get_local_copy(pentry_t *pe,
                    const char *remote)
 {
         dpl_dict_t *metadata = NULL;
@@ -236,7 +248,7 @@ dfs_get_local_copy(struct pentry *pe,
          * it again, just return the (open) file descriptor of the cache file
          */
         if (0 == dfs_md5cmp(pe, (char *)remote))
-                return pe->fd;
+                return pentry_get_fd(pe);
 
         /* a cache file already exist, its MD5 digest is different, so...
          * just remove it */

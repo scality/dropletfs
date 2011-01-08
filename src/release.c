@@ -15,7 +15,7 @@ int
 dfs_release(const char *path,
             struct fuse_file_info *info)
 {
-        struct pentry *pe = NULL;
+        pentry_t *pe = NULL;
         dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
         dpl_vfile_t *vfile = NULL;
         dpl_status_t rc = DPL_FAILURE;
@@ -30,14 +30,21 @@ dfs_release(const char *path,
         FILE *fpsrc = NULL;
         FILE *fpdst = NULL;
 
-        pe = (struct pentry *)info->fh;
-        if (! pe)
-                return 0;
+        pe = (pentry_t *)info->fh;
+        if (! pe) {
+                LOG("no path entry");
+                goto err;
+        }
 
-        fd = pe->fd;
+        fd = pentry_get_fd(pe);
+        if (fd < 0) {
+                LOG("unusable file descriptor fd=%d", fd);
+                goto err;
+        }
+
         LOG("%s, fd=%d", path, fd);
 
-        if (-1 == fstat(pe->fd, &st)) {
+        if (-1 == fstat(fd, &st)) {
                 LOG("fstat(%d, %p) = %s", fd, (void *)&st, strerror(errno));
                 goto err;
         }
@@ -80,7 +87,7 @@ dfs_release(const char *path,
         if (-1 == fd) {
                 LOG("fileno: %s", strerror(errno));
                 LOG("send the file uncompressed");
-                fd = pe->fd;
+                fd = pentry_get_fd(pe);
                 goto send;
         }
 
@@ -91,7 +98,7 @@ dfs_release(const char *path,
 
         /* please rewind before sending the data */
         lseek(fd, 0, SEEK_SET);
-        LOG("compressed file: fd=%d, size=%zu", fd, zst.st_size);
+        LOG("compressed file: fd=%d, size=%llu", fd, zst.st_size);
 
         rc = dpl_dict_update_value(dict, "compression", "zlib");
         if (DPL_SUCCESS != rc)
@@ -127,8 +134,8 @@ dfs_release(const char *path,
         if (fpdst)
                 fclose(fpdst);
 
-        if (-1 != pe->fd)
-                lseek(pe->fd, SEEK_SET, 0);
+        if (-1 != fd)
+                lseek(fd, SEEK_SET, 0);
 
         if (dict)
                 dpl_dict_free(dict);

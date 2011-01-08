@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <glib.h>
 
 #include "open.h"
 #include "log.h"
@@ -6,13 +7,16 @@
 #include "file.h"
 #include "tmpstr.h"
 
+extern GHashTable *hash;
 
 int
 dfs_open(const char *path,
          struct fuse_file_info *info)
 {
-        struct pentry *pe = NULL;
+        pentry_t *pe = NULL;
         char *file = NULL;
+        int fd = -1;
+        int ret = 0;
 
         LOG("%s", path);
         PRINT_FLAGS(path, info);
@@ -23,7 +27,8 @@ dfs_open(const char *path,
                 pe = pentry_new();
                 pentry_set_fd(pe, -1);
         } else {
-                LOG("'%s': found in the hashtable, fd=%d", path, pe->fd);
+                fd = pentry_get_fd(pe);
+                LOG("'%s': found in the hashtable, fd=%d", path, fd);
         }
 
         info->fh = (uint64_t)pe;
@@ -33,6 +38,7 @@ dfs_open(const char *path,
 
         if (! file) {
                 LOG("build_cache_tree(%s) was unable to build a path", path);
+                ret = -1;
                 goto err;
         }
 
@@ -40,19 +46,26 @@ dfs_open(const char *path,
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
                 /* TODO: handle the case where we overwrite a file */
                 LOG("opening cache file '%s'", file);
-                pe->fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
-                if (-1 == pe->fd) {
+                fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
+                if (-1 == fd) {
                         LOG("%s: %s", file, strerror(errno));
+                        ret = -1;
                         goto err;
                 }
+                pentry_set_fd(pe, fd);
         } else {
+                fd = pentry_get_fd(pe);
                 /* otherwise we simply want to read the file */
-                if (-1 == pe->fd)
-                        pe->fd = dfs_get_local_copy(pe, path);
+                if (fd < 0) {
+                        fd = dfs_get_local_copy(pe, path);
+                        pentry_set_fd(pe, fd);
+                }
         }
 
+        ret = 0;
         g_hash_table_insert(hash, (char *)path, pe);
+
   err:
-        LOG("@pentry=%p, fd=%d, flags=0x%X", pe, pe->fd, info->flags);
-        return 0;
+        LOG("@pentry=%p, fd=%d, flags=0x%X", pe, fd, info->flags);
+        return ret;
 }

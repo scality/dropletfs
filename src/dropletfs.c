@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sys/statvfs.h>
 #include <libgen.h>
+#include <glib.h>
 
 #define FUSE_USE_VERSION 29
 #include <fuse.h>

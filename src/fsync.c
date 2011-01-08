@@ -1,10 +1,13 @@
 #include <unistd.h>
 #include <errno.h>
+#include <glib.h>
 
 #include "fsync.h"
 #include "hash.h"
 #include "log.h"
 #include "glob.h"
+
+extern GHashTable *hash;
 
 int
 dfs_fsync(const char *path,
@@ -12,17 +15,30 @@ dfs_fsync(const char *path,
           struct fuse_file_info *info)
 {
         struct pentry *pe = NULL;
+        int fd = -1;
 
         LOG("%s", path);
 
         pe = g_hash_table_lookup(hash, path);
-
-        if (pe && -1 != pe->fd) {
-                if (! issync && -1 == fsync(pe->fd)) {
-                        LOG("%s - %s", path, strerror(errno));
-                        return EIO;
-                }
+        if (! pe) {
+                LOG("unable to find a path entry");
+                goto end;
         }
 
+        fd = pentry_get_fd(pe);
+        if (fd < 0) {
+                LOG("unusable file descriptor: %d", fd);
+                goto end;
+        }
+
+        if (issync)
+                goto end;
+
+        if (-1 == fsync(fd)) {
+                LOG("fsync: %s", strerror(errno));
+                return -errno;
+        }
+
+  end:
         return 0;
 }

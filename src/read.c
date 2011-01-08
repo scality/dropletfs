@@ -17,8 +17,14 @@ dfs_read(const char *path,
 {
         int ret = 0;
         int fd = 0;
+        pentry_t *pe = (pentry_t *)info->fh;
 
-        fd = ((struct pentry *)info->fh)->fd;
+        fd = pentry_get_fd(pe);
+        if (fd < 0) {
+                LOG("unusable file descriptor fd=%d", fd);
+                return EBADF;
+        }
+
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
             path, (void *)buf, size, (long long)offset, fd);
 
