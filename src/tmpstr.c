@@ -15,7 +15,7 @@ static __thread unsigned current;
 char *
 tmpstr_new(void)
 {
-        if (++current > TMPSTR_NB)
+        if (++current >= TMPSTR_NB)
                 current = 0;
 
         return strings[current];
