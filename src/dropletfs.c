@@ -40,6 +40,7 @@
 
 
 #define DEFAULT_ZLIB_LEVEL 3
+#define DEFAULT_CACHE_DIR "/tmp"
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
@@ -47,6 +48,7 @@ mode_t root_mode = 0;
 int debug = 0;
 GHashTable *hash = NULL;
 unsigned long zlib_level = DEFAULT_ZLIB_LEVEL;
+char *cache_dir = NULL;
 
 static void
 atexit_callback(void)
@@ -329,6 +331,32 @@ usage(const char * const prog)
         printf("\t[options]\tfuse/mount options\n");
 }
 
+static int
+set_cache_dir(const char *bucket)
+{
+        char *tmp = NULL;
+        char *p = NULL;
+
+        tmp = getenv("DROPLETFS_CACHE_DIR");
+        if (! tmp)
+                tmp = DEFAULT_CACHE_DIR;
+
+        cache_dir = tmpstr_printf("%s/%s", tmp, ctx->cur_bucket);
+        if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
+                LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
+                return -1;
+        }
+
+        LOG("cache directory created: '%s'", cache_dir);
+        /* remove the trailing spaces */
+        p = cache_dir + strlen(cache_dir) - 1;
+        while (p && '/' == *p) {
+                *p = 0;
+                p--;
+        }
+
+        return 0;
+}
 
 int
 main(int argc, char **argv)
@@ -338,16 +366,11 @@ main(int argc, char **argv)
         hash = NULL;
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
-        char *cache_dir = NULL;
         char *zlib_level_str = NULL;
 
         atexit(atexit_callback);
 
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
-        fp = fopen("/tmp/fuse.log", "a");
-        if (! fp) {
-                goto err0;
-        }
 
         if (argc < 3) {
                 usage(argv[0]);
@@ -391,9 +414,8 @@ main(int argc, char **argv)
 
         LOG("zlib compression level set to: %lu", zlib_level);
 
-        cache_dir = tmpstr_printf("/tmp/%s", ctx->cur_bucket);
-        if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
-                LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
+        if (-1 == set_cache_dir(ctx->cur_bucket)) {
+                LOG("can't create any cache directory");
                 goto err3;
         }
 
@@ -401,12 +423,11 @@ main(int argc, char **argv)
 
   err3:
         dpl_ctx_free(ctx);
-        g_hash_table_remove_all(hash);
+        if (hash)
+                g_hash_table_remove_all(hash);
   err2:
 	dpl_free();
   err1:
-        fclose(fp);
-  err0:
 	return rc;
 }
 

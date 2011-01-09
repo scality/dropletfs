@@ -10,6 +10,7 @@
 #include "zip.h"
 
 extern unsigned long zlib_level;
+extern char *cache_dir;
 
 int
 dfs_release(const char *path,
@@ -56,7 +57,7 @@ dfs_release(const char *path,
 
         size = st.st_size;
 
-        local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
+        local = tmpstr_printf("%s/%s", cache_dir, path);
         zlocal = tmpstr_printf("%s.tmp", local);
 
         dict = dpl_dict_new(13);

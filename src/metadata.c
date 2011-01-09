@@ -28,7 +28,7 @@ assign_meta_to_dict(dpl_dict_t *dict,
         unsigned long val = 0;
         unsigned long size = 0;
         dpl_var_t *var = NULL;
-        char buf[4096] = "";
+        char *buf = NULL;
 
         val = *(unsigned long*)v;
 
@@ -40,7 +40,7 @@ assign_meta_to_dict(dpl_dict_t *dict,
                 dpl_dict_remove(dict, var);
         }
 
-        snprintf(buf, sizeof buf, "%lu", val);
+        buf = tmpstr_printf("%lu", val);
         dpl_dict_add(dict, meta, buf, 0);
 }
 

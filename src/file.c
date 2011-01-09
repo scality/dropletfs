@@ -11,6 +11,7 @@
 #include "zip.h"
 
 extern unsigned long zlib_level;
+extern char *cache_dir;
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -212,7 +213,11 @@ build_cache_tree(const char *path)
         char *local = NULL;
         char *tmp_local = NULL;
 
-        local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, path);
+        /* ignore the leading spaces */
+        while (path && '/' == *path)
+                path++;
+
+        local = tmpstr_printf("%s/%s", cache_dir, path);
 
         tmp_local = strdup(local);
 
@@ -241,7 +246,7 @@ dfs_get_local_copy(pentry_t *pe,
         FILE *fpsrc = NULL;
         FILE *fpdst = NULL;
 
-        local = tmpstr_printf("/tmp/%s/%s", ctx->cur_bucket, remote);
+        local = tmpstr_printf("%s/%s", cache_dir, remote);
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
 
         /* If the remote MD5 matches a cache file, we don't have to download

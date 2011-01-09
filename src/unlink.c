@@ -4,18 +4,20 @@
 #include <unistd.h>
 #include <glib.h>
 
+#include "unlink.h"
 #include "hash.h"
 #include "glob.h"
 #include "log.h"
-#include "unlink.h"
+#include "tmpstr.h"
 
 extern GHashTable *hash;
+extern char *cache_dir;
 
 int
 dfs_unlink(const char *path)
 {
         dpl_status_t rc = DPL_FAILURE;
-        char local[4096] = "";
+        char *local = NULL;
         pentry_t *pe = NULL;
 
         LOG("path=%s", path);
@@ -27,7 +29,7 @@ dfs_unlink(const char *path)
                 return rc;
         }
 
-        snprintf(local, sizeof local, "/tmp/%s/%s", ctx->cur_bucket, path);
+        local = tmpstr_printf("%s/%s", cache_dir, path);
         if (-1 == unlink(local))
                 LOG("unlink cache file (%s): %s", local, strerror(errno));
 

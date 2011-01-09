@@ -11,26 +11,25 @@
 #include "tmpstr.h"
 
 #define MKDIR(path, mode) do {                                          \
+                LOG("mkdir(%s, %o)", path, mode);                       \
                 if (-1 == mkdir(path, mode) && EEXIST != errno)         \
-                        perror("mkdir");                                \
+                        LOG("mkdir(%s): %s", path, strerror(errno));    \
         } while (0)
 
 void
 mkdir_tree(const char *dir) {
-/*         char *tmp = NULL; */
+        char *tmp = NULL;
         char *p = NULL;
-        size_t len;
 
-/*         tmp = tmpstr_printf(tmp, sizeof tmp, "%s", dir); */
-        char tmp[2048];
-        snprintf(tmp, sizeof tmp, "%s", dir);
-        len = strlen(tmp);
+        LOG("dir='%s'", dir);
 
-        if(tmp[len - 1] == '/')
-                tmp[len - 1] = 0;
+        if (! dir)
+                return;
 
-        for(p = tmp + 1; *p; p++) {
-                if(*p == '/') {
+        tmp = tmpstr_printf("%s", dir);
+
+        for (p = tmp + 1; *p; p++) {
+                if ('/' == *p) {
                         *p = 0;
                         MKDIR(tmp, 0755);
                         *p = '/';
