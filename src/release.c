@@ -99,7 +99,7 @@ dfs_release(const char *path,
 
         /* please rewind before sending the data */
         lseek(fd, 0, SEEK_SET);
-        LOG("compressed file: fd=%d, size=%llu", fd, zst.st_size);
+        LOG("compressed file: fd=%d, size=%llu", fd, (unsigned long long)zst.st_size);
 
         rc = dpl_dict_update_value(dict, "compression", "zlib");
         if (DPL_SUCCESS != rc)
