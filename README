@@ -8,10 +8,11 @@ it by yourself.  It relies on the Droplet library, so grab it!
 
 	$ git clone git://github.com/scality/Droplet
 	$ cd Droplet
+	$ ./autogen.sh
 	$ make
+	$ sudo make install
 
-Then go to the dropletfs-fuse directory, set the DPL_DIR to /path/to/Droplet
-in the Makefile and type:
+Then go to the dropletfs-fuse directory, and type:
 
 	$ make
 	$ sudo make install
