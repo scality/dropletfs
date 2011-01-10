@@ -11,7 +11,6 @@
 #include "tmpstr.h"
 
 #define MKDIR(path, mode) do {                                          \
-                LOG("mkdir(%s, %o)", path, mode);                       \
                 if (-1 == mkdir(path, mode) && EEXIST != errno)         \
                         LOG("mkdir(%s): %s", path, strerror(errno));    \
         } while (0)
