@@ -1,7 +1,5 @@
-DPL_DIR=../Droplet/libdroplet
-
-DPL_INC_DIR=$(DPL_DIR)/include
-DPL_LIB_DIR=$(DPL_DIR)/lib
+DPL_INC_DIR=/usr/local/include/droplet-1.0
+DPL_LIB_DIR=/usr/local/lib
 
 DPL_CFLAGS=-I$(DPL_INC_DIR) -L$(DPL_LIB_DIR)
 
