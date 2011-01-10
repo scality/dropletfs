@@ -9,6 +9,7 @@ it by yourself.  It relies on the Droplet library, so grab it!
 	$ git clone git://github.com/scality/Droplet
 	$ cd Droplet
 	$ ./autogen.sh
+	$ ./configure
 	$ make
 	$ sudo make install
 
