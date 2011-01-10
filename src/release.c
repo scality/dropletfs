@@ -144,8 +144,8 @@ dfs_release(const char *path,
         if (vfile)
                 dpl_close(vfile);
 
-/*         if (zlocal && -1 == unlink(zlocal)) */
-/*                 LOG("unlink: %s", strerror(errno)); */
+        if (zlocal && -1 == unlink(zlocal))
+                LOG("unlink: %s", strerror(errno));
 
         return ret;
 }
