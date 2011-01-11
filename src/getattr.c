@@ -68,6 +68,7 @@ dfs_getattr(const char *path,
         dpl_status_t rc;
         dpl_dict_t *metadata = NULL;
         pentry_t *pe = NULL;
+        int ret;
 
         LOG("path=%s, st=%p", path, (void *)st);
 
@@ -76,8 +77,10 @@ dfs_getattr(const char *path,
         /* if the file isn't fully uploaded, get its metadata */
         pe = g_hash_table_lookup(hash, path);
         if (pe) {
-                if (! dfs_getattr_cached(pe, st))
+                if (! dfs_getattr_cached(pe, st))  {
+                        ret = 0;
                         goto end;
+                }
         }
 
         /*
@@ -89,7 +92,8 @@ dfs_getattr(const char *path,
 
 	if (strcmp(path, "/") == 0) {
 		st->st_mode = root_mode | S_IFDIR;
-                return 0;
+                ret = 0;
+                goto end;
 	}
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
@@ -101,8 +105,10 @@ dfs_getattr(const char *path,
             dpl_status_str(rc), dfs_ftypetostr(type),
             parent_ino.key, obj_ino.key);
 
-        if (DPL_SUCCESS != rc)
-                return rc;
+        if (DPL_SUCCESS != rc) {
+                ret = rc;
+                goto end;
+        }
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
@@ -110,7 +116,8 @@ dfs_getattr(const char *path,
                 LOG("dpl_getattr: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);
-                return -1;
+                ret = -1;
+                goto end;
         }
 
         set_default_stat(st, type);
@@ -119,6 +126,7 @@ dfs_getattr(const char *path,
                 dpl_dict_free(metadata);
         }
 
+        ret = 0;
   end:
-        return 0;
+        return ret;
 }
