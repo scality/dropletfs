@@ -233,6 +233,88 @@ build_cache_tree(const char *path)
 }
 
 
+static int
+handle_compression(const char *remote,
+                   char *local,
+                   struct get_data *get_data,
+                   dpl_dict_t *metadata)
+{
+        dpl_status_t rc;
+        char *uzlocal = NULL;
+        FILE *fpsrc = NULL;
+        FILE *fpdst = NULL;
+        char *compressed = NULL;
+        int zret;
+        int ret;
+
+        compressed = dpl_dict_get_value(metadata, "compression");
+        if (! compressed) {
+                LOG("%s: uncompressed remote file", remote);
+                goto end;
+        }
+
+#define ZLIB "zlib"
+        if (0 != strncmp(compressed, ZLIB, strlen(ZLIB)))
+                goto end;
+
+        uzlocal = tmpstr_printf("%s.tmp", local);
+
+        fpsrc = fopen(local, "r");
+        if (! fpsrc) {
+                LOG("fopen: %s", strerror(errno));
+                goto end;
+        }
+
+        fpdst = fopen(uzlocal, "w");
+        if (! fpdst) {
+                LOG("fopen: %s", strerror(errno));
+                goto end;
+        }
+
+        LOG("uncompressing local file '%s'", local);
+
+        zret = unzip(fpsrc, fpdst);
+        if (Z_OK != zret) {
+                LOG("unzip failed: %s", zerr_to_str(zret));
+                ret = -1;
+                goto end;
+        }
+
+        rc = dpl_dict_update_value(metadata, "compression", "none");
+        if (DPL_SUCCESS != rc) {
+                LOG("unable to update 'compression' metadata");
+                ret = -1;
+                goto end;
+        }
+
+        if (-1 == rename(uzlocal, local)) {
+                LOG("rename: %s", strerror(errno));
+                ret = 1;
+                goto end;
+        }
+
+        close(get_data->fd);
+        get_data->fd = open(local, O_RDONLY);
+        if (-1 == get_data->fd) {
+                LOG("open: %s", strerror(errno));
+                ret = -1;
+                goto end;
+        }
+#undef ZLIB
+
+        ret = 0;
+
+  end:
+        if (fpsrc)
+                fclose(fpsrc);
+
+        if (fpdst)
+                fclose(fpdst);
+
+        return ret;
+}
+
+
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(pentry_t *pe,
@@ -242,9 +324,6 @@ dfs_get_local_copy(pentry_t *pe,
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
-        char *compressed = NULL;
-        FILE *fpsrc = NULL;
-        FILE *fpdst = NULL;
 
         local = tmpstr_printf("%s/%s", cache_dir, remote);
         LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
@@ -281,57 +360,14 @@ dfs_get_local_copy(pentry_t *pe,
         }
 
         /* If the file is compressed, uncompress it! */
-#define ZLIB "zlib"
-        compressed = dpl_dict_get_value(metadata, "compression");
-        if (! compressed) {
-                LOG("%s: uncompressed remote file", remote);
+        if(-1 == handle_compression(remote, local, &get_data, metadata))
                 goto end;
-        }
-
-        if (!strncmp(compressed, ZLIB, strlen(ZLIB))) {
-                char *uzlocal = NULL;
-                int zret;
-
-                uzlocal = tmpstr_printf("%s.tmp", local);
-                fpsrc = fopen(local, "r");
-                fpdst = fopen(uzlocal, "w");
-                LOG("uncompressing local file '%s'", local);
-                zret = unzip(fpsrc, fpdst);
-                if (Z_OK != zret) {
-                        LOG("unzip failed: %s", zerr_to_str(zret));
-                        goto end;
-                }
-
-                rc = dpl_dict_update_value(metadata, "compression", "none");
-                if (DPL_SUCCESS != rc) {
-                        LOG("unable to update 'compression' metadata");
-                        goto end;
-                }
-
-                if (-1 == rename(uzlocal, local)) {
-                        LOG("rename: %s", strerror(errno));
-                        goto end;
-                }
-
-                close(get_data.fd);
-                get_data.fd = open(local, O_RDONLY);
-                if (-1 == get_data.fd)
-                        LOG("open: %s", strerror(errno));
-
-        }
-#undef ZLIB
 
   end:
         if (metadata) {
                 pentry_set_metadata(pe, metadata);
                 dpl_dict_free(metadata);
         }
-
-        if (fpsrc)
-                fclose(fpsrc);
-
-        if (fpdst)
-                fclose(fpdst);
 
         return get_data.fd;
 }
