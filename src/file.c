@@ -250,24 +250,30 @@ handle_compression(const char *remote,
         compressed = dpl_dict_get_value(metadata, "compression");
         if (! compressed) {
                 LOG("%s: uncompressed remote file", remote);
+                ret = 0;
                 goto end;
         }
 
 #define ZLIB "zlib"
-        if (0 != strncmp(compressed, ZLIB, strlen(ZLIB)))
+        if (0 != strncmp(compressed, ZLIB, strlen(ZLIB))) {
+                LOG("compression method not supported '%s'", compressed);
+                ret = -1;
                 goto end;
+        }
 
         uzlocal = tmpstr_printf("%s.tmp", local);
 
         fpsrc = fopen(local, "r");
         if (! fpsrc) {
                 LOG("fopen: %s", strerror(errno));
+                ret = -1;
                 goto end;
         }
 
         fpdst = fopen(uzlocal, "w");
         if (! fpdst) {
                 LOG("fopen: %s", strerror(errno));
+                ret = -1;
                 goto end;
         }
 
