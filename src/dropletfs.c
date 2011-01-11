@@ -94,6 +94,8 @@ static int
 dfs_flush(const char *path,
           struct fuse_file_info *info)
 {
+        (void)info;
+
         LOG("%s", path);
         return 0;
 }
@@ -103,6 +105,9 @@ dfs_readlink(const char *path,
              char *buf,
              size_t bufsiz)
 {
+        (void)buf;
+        (void)bufsiz;
+
         LOG("%s", path);
         return 0;
 }
@@ -119,6 +124,8 @@ static int
 dfs_truncate(const char *path,
              off_t offset)
 {
+        (void)offset;
+
         LOG("%s", path);
         return 0;
 }
@@ -127,6 +134,8 @@ static int
 dfs_utime(const char *path,
           struct utimbuf *times)
 {
+        (void)times;
+
         LOG("%s", path);
         return 0;
 }
@@ -135,6 +144,8 @@ static int
 dfs_releasedir(const char *path,
                struct fuse_file_info *info)
 {
+        (void)info;
+
         LOG("%s", path);
         return 0;
 }
@@ -144,6 +155,9 @@ dfs_fsyncdir(const char *path,
              int datasync,
              struct fuse_file_info *info)
 {
+        (void)datasync;
+        (void)info;
+
         LOG("%s", path);
         return 0;
 }
@@ -151,6 +165,8 @@ dfs_fsyncdir(const char *path,
 static void *
 dfs_init(struct fuse_conn_info *conn)
 {
+        (void)conn;
+
         LOG("Entering function");
         return NULL;
 }
@@ -164,6 +180,8 @@ dfs_destroy(void *arg)
 static int
 dfs_access(const char *path, int perm)
 {
+        (void)perm;
+
         LOG("%s", path);
         return 0;
 }
@@ -173,6 +191,9 @@ dfs_ftruncate(const char *path,
               off_t offset,
               struct fuse_file_info *info)
 {
+        (void)offset;
+        (void)info;
+
         LOG("%s", path);
         return 0;
 }
@@ -183,6 +204,10 @@ dfs_lock(const char *path,
          int cmd,
          struct flock *flock)
 {
+        (void)info;
+        (void)cmd;
+        (void)flock;
+
         LOG("%s", path);
         return 0;
 }
@@ -191,6 +216,9 @@ static int
 dfs_utimens(const char *path,
             const struct timespec tv[2])
 {
+        (void)path;
+        (void)tv;
+
         LOG("%s", path);
         return 0;
 }
@@ -200,6 +228,9 @@ dfs_bmap(const char *path,
          size_t blocksize,
          uint64_t *idx)
 {
+        (void)blocksize;
+        (void)idx;
+
         LOG("%s", path);
         return 0;
 }
@@ -223,6 +254,10 @@ dfs_poll(const char *path,
          struct fuse_pollhandle *ph,
          unsigned *reventsp)
 {
+        (void)info;
+        (void)ph;
+        (void)reventsp;
+
         LOG("%s", path);
         return 0;
 }
