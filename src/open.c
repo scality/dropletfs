@@ -16,7 +16,7 @@ dfs_open(const char *path,
         pentry_t *pe = NULL;
         char *file = NULL;
         int fd = -1;
-        int ret = 0;
+        int ret = -1;
 
         LOG("%s", path);
         PRINT_FLAGS(path, info);
@@ -25,10 +25,21 @@ dfs_open(const char *path,
         if (! pe) {
                 LOG("'%s': entry not found in hashtable", path);
                 pe = pentry_new();
+                if (! pe) {
+                        ret = -1;
+                        goto err;
+                }
                 pentry_set_fd(pe, -1);
         } else {
                 fd = pentry_get_fd(pe);
                 LOG("'%s': found in the hashtable, fd=%d", path, fd);
+        }
+
+        /* unlock the file on release() */
+        if (pentry_lock(pe)) {
+                pentry_free(pe);
+                ret = -1;
+                goto err;
         }
 
         info->fh = (uint64_t)pe;
@@ -58,12 +69,16 @@ dfs_open(const char *path,
                 /* otherwise we simply want to read the file */
                 if (fd < 0) {
                         fd = dfs_get_local_copy(pe, path);
+                        if (-1 == fd) {
+                                ret = -1;
+                                goto err;
+                        }
                         pentry_set_fd(pe, fd);
                 }
         }
 
         ret = 0;
-        g_hash_table_insert(hash, (char *)path, pe);
+        g_hash_table_insert(hash, (gpointer)path, pe);
 
   err:
         LOG("@pentry=%p, fd=%d, flags=0x%X", pe, fd, info->flags);
