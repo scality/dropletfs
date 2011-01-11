@@ -11,6 +11,7 @@ struct pentry {
         struct stat st;
         char digest[MD5_DIGEST_LENGTH];
         dpl_dict_t *metadata;
+        int flag;
 };
 
 
@@ -56,6 +57,23 @@ pentry_get_fd(pentry_t *pe)
 
         return pe->fd;
 }
+
+int
+pentry_get_flag(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->flag;
+}
+
+void
+pentry_set_flag(pentry_t *pe, int flag)
+{
+        assert(pe);
+
+        pe->flag = flag;
+}
+
 
 int
 pentry_set_metadata(pentry_t *pe,

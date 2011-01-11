@@ -1,4 +1,6 @@
 #include <libgen.h>
+#include <errno.h>
+#include <glib.h>
 #include <droplet.h>
 
 #include "getattr.h"
@@ -6,6 +8,9 @@
 #include "log.h"
 #include "file.h"
 #include "metadata.h"
+
+
+extern GHashTable *hash;
 
 static void
 set_default_stat(struct stat *st, dpl_ftype_t type)
@@ -28,6 +33,32 @@ set_default_stat(struct stat *st, dpl_ftype_t type)
 }
 
 
+static int
+dfs_getattr_cached(pentry_t *pe,
+                   struct stat *st)
+{
+        int ret;
+        int fd;
+
+        fd = pentry_get_fd(pe);
+
+        if (-1 == fstat(fd, st)) {
+                LOG("fstat: %s", strerror(errno));
+                ret = -1;
+                goto err;
+        }
+
+        if (FLAG_CLEAN == pentry_get_flag(pe)) {
+                LOG("metadata aren't sync between local and remote one");
+                ret = -1;
+                goto err;
+        }
+
+        ret = 0;
+  err:
+        return ret;
+}
+
 int
 dfs_getattr(const char *path,
             struct stat *st)
@@ -36,9 +67,18 @@ dfs_getattr(const char *path,
         dpl_ino_t ino, parent_ino, obj_ino;
         dpl_status_t rc;
         dpl_dict_t *metadata = NULL;
+        pentry_t *pe = NULL;
+
+        LOG("path=%s, st=%p", path, (void *)st);
 
         memset(st, 0, sizeof *st);
-        LOG("path=%s, st=%p", path, (void *)st);
+
+        /* if the file isn't fully uploaded, get its metadata */
+        pe = g_hash_table_lookup(hash, path);
+        if (pe) {
+                if (! dfs_getattr_cached(pe, st))
+                        goto end;
+        }
 
         /*
          * why setting st_nlink to 1?
@@ -79,5 +119,6 @@ dfs_getattr(const char *path,
                 dpl_dict_free(metadata);
         }
 
+  end:
         return 0;
 }

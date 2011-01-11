@@ -9,8 +9,16 @@
 
 typedef struct pentry pentry_t;
 
+enum {
+        FLAG_CLEAN,
+        FLAG_DIRTY,
+};
+
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
+
+int pentry_get_flag(pentry_t *);
+void pentry_set_flag(pentry_t *, int);
 
 void pentry_set_fd(pentry_t *, int);
 int pentry_get_fd(pentry_t *);
