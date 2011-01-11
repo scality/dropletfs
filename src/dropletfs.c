@@ -341,7 +341,7 @@ set_cache_dir(const char *bucket)
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
-        cache_dir = tmpstr_printf("%s/%s", tmp, ctx->cur_bucket);
+        cache_dir = tmpstr_printf("%s/%s", tmp, bucket);
         if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
                 LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
                 return -1;
