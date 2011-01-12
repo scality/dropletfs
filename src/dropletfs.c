@@ -416,7 +416,7 @@ set_compression_env(void)
         tmp = getenv("DROPLETFS_ZLIB_LEVEL");
         LOG("DROPLETFS_ZLIB_LEVEL=%s", tmp);
 
-        if (! tmp)
+        if (tmp)
                 zlib_level = strtoul(tmp, NULL, 10);
         else
                 zlib_level = DEFAULT_ZLIB_LEVEL;
