@@ -94,10 +94,12 @@ compress_before_sending(char *local,
                 goto end;
         }
 
-        ret = zst.st_size;
+        ret = 0;
 
-        if (fd)
+        if (fd) {
+                ret = zst.st_size;
                 *fd = zfd;
+        }
 
   end:
         if (fpsrc)
