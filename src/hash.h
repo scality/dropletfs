@@ -17,6 +17,9 @@ enum {
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
 
+int pentry_lock(pentry_t *);
+int pentry_unlock(pentry_t *);
+
 int pentry_get_flag(pentry_t *);
 void pentry_set_flag(pentry_t *, int);
 

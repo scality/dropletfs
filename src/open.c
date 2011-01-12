@@ -40,6 +40,7 @@ dfs_open(const char *path,
                 pentry_free(pe);
                 ret = -1;
                 goto err;
+
         }
 
         info->fh = (uint64_t)pe;

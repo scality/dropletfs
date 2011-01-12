@@ -254,7 +254,14 @@ handle_compression(const char *remote,
                 goto end;
         }
 
+#define NONE "none"
 #define ZLIB "zlib"
+        if (0 == strncmp(compressed, NONE, strlen(NONE))) {
+                LOG("compression method: 'none'");
+                ret = 0;
+                goto end;
+        }
+
         if (0 != strncmp(compressed, ZLIB, strlen(ZLIB))) {
                 LOG("compression method not supported '%s'", compressed);
                 ret = -1;
@@ -307,6 +314,7 @@ handle_compression(const char *remote,
                 goto end;
         }
 #undef ZLIB
+#undef NONE
 
         ret = 0;
 

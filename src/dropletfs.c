@@ -39,6 +39,7 @@
 #include "chown.h"
 
 
+#define DEFAULT_COMPRESSION_METHOD "zlib"
 #define DEFAULT_ZLIB_LEVEL 3
 #define DEFAULT_CACHE_DIR "/tmp"
 
@@ -47,7 +48,8 @@ FILE *fp = NULL;
 mode_t root_mode = 0;
 int debug = 0;
 GHashTable *hash = NULL;
-unsigned long zlib_level = DEFAULT_ZLIB_LEVEL;
+unsigned long zlib_level = 0;
+char *compression_method = NULL;
 char *cache_dir = NULL;
 
 static void
@@ -367,7 +369,7 @@ usage(const char * const prog)
 }
 
 static int
-set_cache_dir(const char *bucket)
+set_cache_dir(void)
 {
         char *tmp = NULL;
         char *p = NULL;
@@ -376,7 +378,7 @@ set_cache_dir(const char *bucket)
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
-        cache_dir = tmpstr_printf("%s/%s", tmp, bucket);
+        cache_dir = tmpstr_printf("%s/%s", tmp, ctx->cur_bucket);
         if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
                 LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
                 return -1;
@@ -393,6 +395,45 @@ set_cache_dir(const char *bucket)
         return 0;
 }
 
+static void
+set_compression_env(void)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_COMPRESSION_METHOD");
+        LOG("DROPLETFS_COMPRESSION_METHOD=%s", tmp);
+
+        if (tmp) {
+                if (0 == strncasecmp(tmp, "none", strlen("none"))) {
+                        compression_method = "none";
+                        return;
+                }
+                if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
+                        LOG("unknown method '%s'", tmp);
+        }
+
+        compression_method = DEFAULT_COMPRESSION_METHOD;
+        tmp = getenv("DROPLETFS_ZLIB_LEVEL");
+        LOG("DROPLETFS_ZLIB_LEVEL=%s", tmp);
+
+        if (! tmp)
+                zlib_level = strtoul(tmp, NULL, 10);
+        else
+                zlib_level = DEFAULT_ZLIB_LEVEL;
+}
+
+
+static void
+set_dplfs_env(void)
+{
+        set_compression_env();
+
+        if (-1 == set_cache_dir()) {
+                LOG("can't create any cache directory");
+                exit(EXIT_FAILURE);
+        }
+}
+
 int
 main(int argc, char **argv)
 {
@@ -401,7 +442,6 @@ main(int argc, char **argv)
         hash = NULL;
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
-        char *zlib_level_str = NULL;
 
         atexit(atexit_callback);
 
@@ -438,25 +478,12 @@ main(int argc, char **argv)
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
-        zlib_level_str = getenv("DROPLETFS_ZLIB_LEVEL");
-        if (zlib_level_str) {
-                zlib_level = strtoul(zlib_level_str, NULL, 10);
-                if (ULONG_MAX == zlib_level) {
-                        zlib_level = DEFAULT_ZLIB_LEVEL;
-                        LOG("strtoul: %s", strerror(errno));
-                }
-        }
-
+        set_dplfs_env();
         LOG("zlib compression level set to: %lu", zlib_level);
-
-        if (-1 == set_cache_dir(ctx->cur_bucket)) {
-                LOG("can't create any cache directory");
-                goto err3;
-        }
+        LOG("zlib compression method set to: %s", compression_method);
 
         rc = dfs_fuse_main(&args);
 
-  err3:
         dpl_ctx_free(ctx);
         if (hash)
                 g_hash_table_remove_all(hash);
