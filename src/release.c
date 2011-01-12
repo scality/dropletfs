@@ -63,7 +63,7 @@ compress_before_sending(char *local,
         zrc = zip(fpsrc, fpdst, zlib_level);
         if (Z_OK != zrc) {
                 LOG("zip failed: %s", zerr_to_str(zrc));
-                ret = -1;
+                ret = 0;
                 goto end;
         }
 
@@ -78,7 +78,7 @@ compress_before_sending(char *local,
 
         if (-1 == fstat(zfd, &zst)) {
                 LOG("fstat: %s", strerror(errno));
-                ret = -1;
+                ret = 0;
                 goto end;
         }
 
@@ -161,14 +161,15 @@ dfs_release(const char *path,
         zlocal = tmpstr_printf("%s.tmp", local);
 
         zsize = compress_before_sending(local, zlocal, dict, &fd);
-        if (0 == zsize)
-                goto send;
+
+        /* error in source file, don't upload it */
         if (zsize < 0)
                 goto err;
 
-        size = zsize;
+        /* file correctly compressed, send it */
+        if (zsize > 0)
+                size = zsize;
 
-  send:
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
