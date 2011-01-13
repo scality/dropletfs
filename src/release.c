@@ -214,6 +214,6 @@ dfs_release(const char *path,
 
         (void)pentry_unlock(pe);
 
-        LOG("return code %d", ret);
+        LOG("return value=%d", ret);
         return ret;
 }

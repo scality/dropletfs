@@ -41,6 +41,7 @@ assign_meta_to_dict(dpl_dict_t *dict,
         }
 
         buf = tmpstr_printf("%lu", val);
+        LOG("meta='%s', value='%s'", meta, buf);
         dpl_dict_add(dict, meta, buf, 0);
 }
 
@@ -97,7 +98,7 @@ metadatatoll(dpl_dict_t *dict,
 
 #define STORE_META(st, dict, name, type) do {                           \
                 long long v = metadatatoll(dict, #name);                \
-                if (-1 != v)                                            \
+                if (v < 0)                                              \
                         st->st_##name = (type)v;                        \
         } while (0 /*CONSTCOND*/)
 

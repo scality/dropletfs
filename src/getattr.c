@@ -42,18 +42,23 @@ dfs_getattr_cached(pentry_t *pe,
 
         fd = pentry_get_fd(pe);
 
-        if (-1 == fstat(fd, st)) {
-                LOG("fstat: %s", strerror(errno));
-                ret = -1;
-                goto err;
-        }
-
+        /* if the flag is CLEAN, then the file was successfully uploaded,
+         * just grab its metadata */
         if (FLAG_CLEAN == pentry_get_flag(pe)) {
                 LOG("metadata aren't sync between local and remote one");
                 ret = -1;
                 goto err;
         }
 
+        /* otherwise, use the `struct stat' info of local cache file
+         * descriptor */
+        if (-1 == fstat(fd, st)) {
+                LOG("fstat: %s", strerror(errno));
+                ret = -1;
+                goto err;
+        }
+
+        LOG("use the cache file descriptor (%d) to fill struct stat", fd);
         ret = 0;
   err:
         return ret;
