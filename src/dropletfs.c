@@ -39,7 +39,7 @@
 #include "chown.h"
 
 
-#define DEFAULT_COMPRESSION_METHOD "zlib"
+#define DEFAULT_COMPRESSION_METHOD "NONE"
 #define DEFAULT_ZLIB_LEVEL 3
 #define DEFAULT_CACHE_DIR "/tmp"
 
