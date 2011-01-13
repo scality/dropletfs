@@ -69,6 +69,7 @@ dfs_getattr(const char *path,
         dpl_dict_t *metadata = NULL;
         pentry_t *pe = NULL;
         int ret;
+        int tries = 0;
 
         LOG("path=%s, st=%p", path, (void *)st);
 
@@ -98,6 +99,7 @@ dfs_getattr(const char *path,
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
+ namei_retry:
         rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                        ino, &parent_ino, &obj_ino, &type);
 
@@ -106,13 +108,27 @@ dfs_getattr(const char *path,
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc) {
+                if (DPL_ENOENT != rc && tries < 3) {
+                        tries++;
+                        sleep(1);
+                        LOG("namei timeout? (%s)", dpl_status_str(rc));
+                        goto namei_retry;
+                }
                 ret = rc;
                 goto end;
         }
 
+        tries = 0;
+ getattr_retry:
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
+                if (tries < 3) {
+                        tries++;
+                        sleep(1);
+                        LOG("getattr timeout? (%s)", dpl_status_str(rc));
+                        goto getattr_retry;
+                }
                 LOG("dpl_getattr: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);

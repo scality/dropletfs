@@ -128,6 +128,7 @@ dfs_release(const char *path,
         int fd = -1;
         char *local = NULL;
         char *zlocal = NULL;
+        int tries = 0;
 
         pe = (pentry_t *)info->fh;
         if (! pe) {
@@ -170,6 +171,7 @@ dfs_release(const char *path,
         if (zsize > 0)
                 size = zsize;
 
+ retry:
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
@@ -178,8 +180,12 @@ dfs_release(const char *path,
                            size,
                            &vfile);
 
-
         if (DPL_SUCCESS != rc) {
+                if (rc != DPL_ENOENT && tries < 3) {
+                        tries++;
+                        sleep(1);
+                        goto retry;
+                }
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
                 ret = -1;
                 goto err;
@@ -208,5 +214,6 @@ dfs_release(const char *path,
 
         (void)pentry_unlock(pe);
 
+        LOG("return code %d", ret);
         return ret;
 }

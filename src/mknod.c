@@ -10,12 +10,20 @@ dfs_mknod(const char *path,
           dev_t dev)
 {
         dpl_status_t rc = DPL_FAILURE;
+        int tries = 0;
 
         LOG("%s, mode=0x%X", path, (unsigned)mode);
 
         rc = dpl_mknod(ctx, (char *)path);
 
+ retry:
         if (DPL_SUCCESS != rc) {
+                if (tries < 3) {
+                        LOG("mknod: timeout? (%s)", dpl_status_str(rc));
+                        tries++;
+                        sleep(1);
+                        goto retry;
+                }
                 LOG("dpl_mknod: %s", dpl_status_str(rc));
                 return rc;
         }

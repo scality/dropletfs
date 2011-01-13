@@ -82,6 +82,6 @@ dfs_open(const char *path,
         g_hash_table_insert(hash, (gpointer)path, pe);
 
   err:
-        LOG("@pentry=%p, fd=%d, flags=0x%X", pe, fd, info->flags);
+        LOG("@pentry=%p, fd=%d, flags=0x%X, ret=%d", pe, fd, info->flags, ret);
         return ret;
 }

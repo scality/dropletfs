@@ -35,6 +35,7 @@ write_all(int fd,
 
 	ssize_t cc;
 	int remain;
+        int tries = 0;
 
 	remain = len;
 	while (1) {
@@ -43,6 +44,12 @@ write_all(int fd,
 		if (-1 == cc) {
 			if (EINTR == errno)
 				goto again;
+                        if (tries < 3 && (EAGAIN == errno || EWOULDBLOCK == errno)) {
+                                LOG("write: timeout?");
+                                tries++;
+                                sleep(1);
+                                goto again;
+                        }
 			return -1;
 		}
 
@@ -61,6 +68,7 @@ read_all(int fd,
         dpl_status_t rc = DPL_FAILURE;
         static int blksize = 4096;
         char *buf = NULL;
+        int tries = 0;
 
         buf = alloca(blksize);
         while (1)
@@ -73,9 +81,15 @@ read_all(int fd,
 
                 if (0 == r)
                         break;
-
+        retry_write:
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
+                        if (tries < 3) {
+                                LOG("dpl_write: timeout?");
+                                tries++;
+                                sleep(1);
+                                goto retry_write;
+                        }
                         LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
                         return -1;
                 }
@@ -162,6 +176,7 @@ dfs_md5cmp(pentry_t *pe,
         dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
         char *digest = NULL;
+        int tries = 0;
 
         digest = pentry_get_digest(pe);
         if (! digest) {
@@ -169,8 +184,15 @@ dfs_md5cmp(pentry_t *pe,
                 goto err;
         }
 
+ namei_retry:
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
         if (DPL_ENOENT == rc) {
+                if (DPL_ENOENT != rc && tries < 3) {
+                        tries++;
+                        sleep(1);
+                        LOG("namei timeout? (%s)", dpl_status_str(rc));
+                        goto namei_retry;
+                }
                 LOG("dpl_namei: %s", dpl_status_str(rc));
                 goto err;
         }
