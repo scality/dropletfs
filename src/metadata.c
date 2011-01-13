@@ -98,7 +98,7 @@ metadatatoll(dpl_dict_t *dict,
 
 #define STORE_META(st, dict, name, type) do {                           \
                 long long v = metadatatoll(dict, #name);                \
-                if (v < 0)                                              \
+                if (-1 != v)                                            \
                         st->st_##name = (type)v;                        \
         } while (0 /*CONSTCOND*/)
 
