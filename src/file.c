@@ -163,10 +163,11 @@ dfs_md5cmp(pentry_t *pe,
         if (remote_md5) {
                 LOG("remote md5=%s", remote_md5);
                 LOG("local md5=%.*s", MD5_DIGEST_LENGTH, digest);
-                diff = strncasecmp(digest, remote_md5, MD5_DIGEST_LENGTH);
+                diff = memcmp(digest, remote_md5, MD5_DIGEST_LENGTH);
                 if (diff) {
                         pentry_set_digest(pe, remote_md5);
-                        LOG("updated local md5=%s", pentry_get_digest(pe));
+                        LOG("updated local md5=%.*s",
+                            MD5_DIGEST_LENGTH, pentry_get_digest(pe));
                 }
         }
 

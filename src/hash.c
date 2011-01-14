@@ -148,7 +148,7 @@ pentry_set_digest(pentry_t *pe,
         if (! digest)
                 return -1;
 
-        memcpy(pe->digest, digest, MD5_DIGEST_LENGTH);
+        memcpy(pe->digest, digest, sizeof pe->digest);
         return 0;
 }
 
