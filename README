@@ -1,7 +1,13 @@
+1. OVERVIEW
+===========
+
 Dropletfs-fuse, a FUSE filesystem for cloud storage, using the Scality
 Droplet library [1].  Be sure to read and configure your environment as
 explained in [2].
 
+
+2. INSTALLATION
+===============
 
 This program is not packaged yet, as far as I know.  You'll have to compile
 it by yourself.  It relies on the Droplet library, so grab it!
@@ -13,16 +19,45 @@ it by yourself.  It relies on the Droplet library, so grab it!
 	$ make
 	$ sudo make install
 
+If the previous lines fail, I suggest you take a look to [3].
+
 Then go to the dropletfs-fuse directory, and type:
 
 	$ make
 	$ sudo make install
 
+
+3. SETTINGS
+===========
+
+ - libdroplet object path
+
+the Droplet library is installed in /usr/local/lib by default, so you may have
+to set LD_LIBRARY_PATH to this value before running dplfs.
+
+ - Compression
+
+You can set DROPLETFS_COMPRESSION_METHOD to ZLIB, to reduce the network load.
+Default value is NONE. The default compression level is 3. You can change it
+through DROPLETFS_ZLIB_LEVEL.
+
+ - Cache directory
+
+Dropletfs use a local cache directory to operate on file descriptors.  This
+cache holds the whole files you're working on.  I strongly recommend you to
+set it to a directory in a partition with a bunch of available GB.
+
+You can change its value through DROPLETFS_CACHE_DIR.  Default is /tmp.
+
+
+4. FIRST RUN
+============
+
 Now, mount your cloud storage wherever you want, and enjoy!
 
-	$ sudo mkdir /mnt/cloud
-	$ dplfs <my bucketname> /mnt/cloud
-	$ ls /mnt/cloud
+	$ sudo mkdir /tmp/cloud
+	$ dplfs <my bucketname> /tmp/cloud
+	$ ls /tmp/cloud
 	total 0
 	-rw-r--r-- 1 poz poz      10 Dec 20 16:18 bar
 	dr-x------ 1 poz fuse      0 Dec 30 23:20 code/
@@ -35,9 +70,12 @@ Now, mount your cloud storage wherever you want, and enjoy!
 	-rw-r--r-- 1 poz poz     111 Dec 29 12:19 tmpstr.h
 	$
 
+
+
 Please report bugs and comments to:
 	https://github.com/pozdnychev/dropletfs-fuse/issues
 
 
 [1] http://github.com/scality/Droplet
 [2] http://github.com/scality/Droplet/wiki/Configuration-file
+[3] http://github.com/scality/Droplet/README
