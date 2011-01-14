@@ -108,6 +108,7 @@ compress_before_sending(char *local,
         if (fpdst)
                 fclose(fpdst);
 
+        LOG("return value=%d", ret);
         return ret;
 
 }
@@ -129,6 +130,8 @@ dfs_release(const char *path,
         char *local = NULL;
         char *zlocal = NULL;
         int tries = 0;
+
+        LOG("path=%s", path);
 
         pe = (pentry_t *)info->fh;
         if (! pe) {
@@ -206,13 +209,13 @@ dfs_release(const char *path,
         if (vfile)
                 dpl_close(vfile);
 
-        if (pe)
+        if (pe) {
                 pentry_set_flag(pe, FLAG_CLEAN);
+                (void)pentry_unlock(pe);
+        }
 
         if (zlocal && -1 == unlink(zlocal))
                 LOG("unlink: %s", strerror(errno));
-
-        (void)pentry_unlock(pe);
 
         LOG("return value=%d", ret);
         return ret;
