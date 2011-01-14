@@ -44,8 +44,6 @@ dfs_open(const char *path,
         }
 
         info->fh = (uint64_t)pe;
-        info->direct_io = 1;
-
         file = build_cache_tree(path);
 
         if (! file) {
