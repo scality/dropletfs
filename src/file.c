@@ -118,54 +118,6 @@ cb_get_buffered(void *arg,
 }
 
 
-
-void
-dfs_put_local_copy(dpl_dict_t *dict,
-                   struct fuse_file_info *info,
-                   const char *remote)
-{
-        int fd = -1;
-        dpl_canned_acl_t canned_acl = DPL_CANNED_ACL_PRIVATE;
-        dpl_vfile_t *vfile = NULL;
-        dpl_status_t rc = DPL_FAILURE;
-        char *s = NULL;
-        unsigned long size = 0;
-        pentry_t *pe = (pentry_t *)info->fh;
-
-        fd = pentry_get_fd(pe);
-        LOG("entering... remote=%s, info->fh=%d", remote, fd);
-
-        if (-1 == fd) {
-                LOG("invalid fd");
-                return;
-        }
-
-        s = dpl_dict_get_value(dict, "size");
-        size = s ? strtoul(s, NULL, 10) : 0;
-        LOG("size=%lu", size);
-
-        rc = dpl_openwrite(ctx,
-                           (char *)remote,
-                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
-                           dict,
-                           canned_acl,
-                           size,
-                           &vfile);
-
-        if (DPL_SUCCESS != rc) {
-                LOG("dpl_openwrite: %s", dpl_status_str(rc));
-                goto err;
-        }
-
-        if (-1 == read_all(fd, vfile))
-                goto err;
-
-  err:
-
-        if (vfile)
-                dpl_close(vfile);
-}
-
 static int
 dfs_md5cmp(pentry_t *pe,
            char *path)

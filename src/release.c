@@ -108,7 +108,7 @@ compress_before_sending(char *local,
         if (fpdst)
                 fclose(fpdst);
 
-        LOG("return value=%d", ret);
+        LOG("return value=%zd", ret);
         return ret;
 
 }
