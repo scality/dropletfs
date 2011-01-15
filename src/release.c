@@ -17,12 +17,10 @@ extern int max_retry;
 /*
  * compress a file, return its size and set `fd' to its file descriptor value
  *
- *
  * return the size of the compressed file
  * ret = 0 -> no compression
  * ret < 0 -> an error occurred
  * ret > 0 -> everything's ok
- *
  *
  */
 static ssize_t

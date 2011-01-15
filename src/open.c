@@ -43,14 +43,16 @@ dfs_open(const char *path,
                 LOG("'%s': found in the hashtable, fd=%d", path, fd);
         }
 
-        /* unlock the file on release() */
-        LOG("pentry_lock(fd=%d)..", fd);
-        if (pentry_lock(pe)) {
-                LOG("pentry_lock(%d) failed: %s", fd, strerror(errno));
-                ret = -1;
-                goto err;
+        if (O_RDONLY != (info->flags & O_ACCMODE)) {
+                /* unlock the file on release() */
+                LOG("pentry_lock(fd=%d)..", fd);
+                if (pentry_lock(pe)) {
+                        LOG("pentry_lock(%d) failed: %s", fd, strerror(errno));
+                        ret = -1;
+                        goto err;
+                }
+                LOG("pentry_lock(fd=%d) finished!", fd);
         }
-        LOG("pentry_lock(fd=%d) finished!", fd);
 
         info->fh = (uint64_t)pe;
         file = build_cache_tree(path);

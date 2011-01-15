@@ -48,7 +48,6 @@ dfs_getattr_cached(pentry_t *pe,
         if (FLAG_CLEAN == pentry_get_flag(pe)) {
                 LOG("file upload isn't finished yet");
                 ret = -1;
-                goto err;
         }
 
         /* otherwise, use the `struct stat' info of local cache file
