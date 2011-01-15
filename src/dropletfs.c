@@ -42,15 +42,18 @@
 #define DEFAULT_COMPRESSION_METHOD "NONE"
 #define DEFAULT_ZLIB_LEVEL 3
 #define DEFAULT_CACHE_DIR "/tmp"
+#define DEFAULT_MAX_RETRY 5
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
 mode_t root_mode = 0;
 int debug = 0;
 GHashTable *hash = NULL;
+
 unsigned long zlib_level = 0;
 char *compression_method = NULL;
 char *cache_dir = NULL;
+int max_retry = 0;
 
 static void
 atexit_callback(void)
@@ -376,6 +379,7 @@ set_cache_dir(void)
         char *p = NULL;
 
         tmp = getenv("DROPLETFS_CACHE_DIR");
+        LOG("DROPLETFS_CACHE_DIR=%s", tmp ? tmp : "unset");
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
@@ -385,13 +389,13 @@ set_cache_dir(void)
                 return -1;
         }
 
-        LOG("cache directory created: '%s'", cache_dir);
         /* remove the trailing spaces */
         p = cache_dir + strlen(cache_dir) - 1;
         while (p && '/' == *p) {
                 *p = 0;
                 p--;
         }
+        LOG("cache directory created: '%s'", cache_dir);
 
         return 0;
 }
@@ -402,18 +406,15 @@ set_compression_env(void)
         char *tmp = NULL;
 
         tmp = getenv("DROPLETFS_COMPRESSION_METHOD");
-        LOG("DROPLETFS_COMPRESSION_METHOD=%s", tmp);
+        LOG("DROPLETFS_COMPRESSION_METHOD=%s", tmp ? tmp : "unset");
 
         if (tmp) {
-                if (0 == strncasecmp(tmp, "none", strlen("none"))) {
-                        compression_method = "none";
-                        return;
-                }
                 if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
-                        LOG("unknown method '%s'", tmp);
+                        compression_method = DEFAULT_COMPRESSION_METHOD;
+                else
+                        compression_method = tmp;
         }
 
-        compression_method = DEFAULT_COMPRESSION_METHOD;
         tmp = getenv("DROPLETFS_ZLIB_LEVEL");
         LOG("DROPLETFS_ZLIB_LEVEL=%s", tmp);
 
@@ -423,11 +424,24 @@ set_compression_env(void)
                 zlib_level = DEFAULT_ZLIB_LEVEL;
 }
 
+static void
+set_max_retry_env(void)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_MAX_RETRY");
+        LOG("DROPLETFS_MAX_RETRY=%s", tmp ? tmp : "unset");
+
+        max_retry = DEFAULT_MAX_RETRY;
+        if (tmp)
+                max_retry = strtoul(tmp, NULL, 10);
+}
 
 static void
 set_dplfs_env(void)
 {
         set_compression_env();
+        set_max_retry_env();
 
         if (-1 == set_cache_dir()) {
                 LOG("can't create any cache directory");
@@ -482,6 +496,8 @@ main(int argc, char **argv)
         set_dplfs_env();
         LOG("zlib compression level set to: %lu", zlib_level);
         LOG("zlib compression method set to: %s", compression_method);
+	LOG("local cache directory set to: %s", cache_dir);
+	LOG("max number of network i/o attempts set to: %d", max_retry);
 
         rc = dfs_fuse_main(&args);
 

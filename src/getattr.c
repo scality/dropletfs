@@ -9,7 +9,7 @@
 #include "file.h"
 #include "metadata.h"
 
-
+extern int max_retry;
 extern GHashTable *hash;
 
 static void
@@ -41,11 +41,12 @@ dfs_getattr_cached(pentry_t *pe,
         int fd;
 
         fd = pentry_get_fd(pe);
+        LOG("pe@%p, fd=%d", (void *)pe, fd);
 
         /* if the flag is CLEAN, then the file was successfully uploaded,
          * just grab its metadata */
         if (FLAG_CLEAN == pentry_get_flag(pe)) {
-                LOG("metadata aren't sync between local and remote one");
+                LOG("file upload isn't finished yet");
                 ret = -1;
                 goto err;
         }
@@ -75,6 +76,7 @@ dfs_getattr(const char *path,
         pentry_t *pe = NULL;
         int ret;
         int tries = 0;
+        int delay = 1;
 
         LOG("path=%s, st=%p", path, (void *)st);
 
@@ -88,6 +90,8 @@ dfs_getattr(const char *path,
                         goto end;
                 }
         }
+
+        LOG("we have to retrieve metadata to check synchronization");
 
         /*
          * why setting st_nlink to 1?
@@ -113,9 +117,10 @@ dfs_getattr(const char *path,
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc) {
-                if (DPL_ENOENT != rc && tries < 3) {
+                if (DPL_ENOENT != rc && (tries < max_retry)) {
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         LOG("namei timeout? (%s)", dpl_status_str(rc));
                         goto namei_retry;
                 }
@@ -123,14 +128,16 @@ dfs_getattr(const char *path,
                 goto end;
         }
 
+        delay = 1;
         tries = 0;
  getattr_retry:
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                if (tries < 3) {
+                if (tries < max_retry) {
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         LOG("getattr timeout? (%s)", dpl_status_str(rc));
                         goto getattr_retry;
                 }

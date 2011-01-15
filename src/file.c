@@ -12,6 +12,7 @@
 
 extern unsigned long zlib_level;
 extern char *cache_dir;
+extern int max_retry;
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -36,6 +37,7 @@ write_all(int fd,
 	ssize_t cc;
 	int remain;
         int tries = 0;
+        int delay = 1;
 
 	remain = len;
 	while (1) {
@@ -44,10 +46,12 @@ write_all(int fd,
 		if (-1 == cc) {
 			if (EINTR == errno)
 				goto again;
-                        if (tries < 3 && (EAGAIN == errno || EWOULDBLOCK == errno)) {
+                        if ((tries < max_retry) &&
+                            (EAGAIN == errno || EWOULDBLOCK == errno)) {
                                 LOG("write: timeout?");
                                 tries++;
-                                sleep(1);
+                                sleep(delay);
+                                delay *= 2;
                                 goto again;
                         }
 			return -1;
@@ -69,6 +73,7 @@ read_all(int fd,
         static int blksize = 4096;
         char *buf = NULL;
         int tries = 0;
+        int delay = 1;
 
         buf = alloca(blksize);
         while (1)
@@ -84,10 +89,11 @@ read_all(int fd,
         retry_write:
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
-                        if (tries < 3) {
+                        if (tries < max_retry) {
                                 LOG("dpl_write: timeout?");
                                 tries++;
-                                sleep(1);
+                                sleep(delay);
+                                delay *= 2;
                                 goto retry_write;
                         }
                         LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
@@ -129,6 +135,7 @@ dfs_md5cmp(pentry_t *pe,
         dpl_ino_t ino, obj_ino;
         char *digest = NULL;
         int tries = 0;
+        int delay = 1;
 
         digest = pentry_get_digest(pe);
         if (! digest) {
@@ -139,9 +146,10 @@ dfs_md5cmp(pentry_t *pe,
  namei_retry:
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
         if (DPL_ENOENT == rc) {
-                if (DPL_ENOENT != rc && tries < 3) {
+                if (DPL_ENOENT != rc && (tries < max_retry)) {
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         LOG("namei timeout? (%s)", dpl_status_str(rc));
                         goto namei_retry;
                 }

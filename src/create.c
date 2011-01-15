@@ -10,6 +10,8 @@
 #include "metadata.h"
 #include "hash.h"
 
+extern int max_retry;
+
 int
 dfs_create(const char *path,
            mode_t mode,
@@ -24,6 +26,7 @@ dfs_create(const char *path,
         int fd = -1;
         dpl_dict_t *meta = NULL;
         int tries = 0;
+        int delay = 1;
 
         LOG("%s, mode=0x%x", path, (unsigned)mode);
         PRINT_FLAGS(path, info);
@@ -45,9 +48,10 @@ dfs_create(const char *path,
             dpl_status_str(rc));
 
         if (DPL_ENOENT != rc) {
-                if (tries < 3) {
+                if (tries < max_retry) {
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         LOG("namei timeout? (%s)", dpl_status_str(rc));
                         goto namei_retry;
                 }
@@ -87,15 +91,17 @@ dfs_create(const char *path,
         fill_metadata_from_stat(meta, &st);
         assign_meta_to_dict(meta, "mode", &mode);
 
+        delay = 1;
         tries = 0;
   retry:
         rc = dpl_mknod(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                if (tries < 3) {
+                if ((tries < max_retry)) {
                         LOG("mknod: timeout? (%s)", dpl_status_str(rc));
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         goto retry;
                 }
                 LOG("dpl_mknod (%s)", dpl_status_str(rc));

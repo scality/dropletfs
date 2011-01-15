@@ -12,6 +12,7 @@
 extern unsigned long zlib_level;
 extern char *compression_method;
 extern char *cache_dir;
+extern int max_retry;
 
 /*
  * compress a file, return its size and set `fd' to its file descriptor value
@@ -130,6 +131,7 @@ dfs_release(const char *path,
         char *local = NULL;
         char *zlocal = NULL;
         int tries = 0;
+        int delay = 1;
 
         LOG("path=%s", path);
 
@@ -184,9 +186,10 @@ dfs_release(const char *path,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
-                if (rc != DPL_ENOENT && tries < 3) {
+                if (rc != DPL_ENOENT && (tries < max_retry)) {
                         tries++;
-                        sleep(1);
+                        sleep(delay);
+                        delay *= 2;
                         goto retry;
                 }
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
