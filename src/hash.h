@@ -14,6 +14,8 @@ enum {
         FLAG_DIRTY,
 };
 
+void hash_print_all(void);
+
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
 

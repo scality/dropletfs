@@ -22,7 +22,8 @@ dfs_read(const char *path,
         fd = pentry_get_fd(pe);
         if (fd < 0) {
                 LOG("unusable file descriptor fd=%d", fd);
-                return EBADF;
+                ret = EBADF;
+                goto end;
         }
 
         LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
@@ -32,9 +33,11 @@ dfs_read(const char *path,
 
         if (-1 == ret) {
                 LOG("%s (fd=%d) - %s (%d)", path, fd, strerror(errno), errno);
-                return -errno;
+                ret = -errno;
+                goto end;
         }
 
+  end:
         LOG("%s - %d bytes read", path, ret);
         return ret;
 }

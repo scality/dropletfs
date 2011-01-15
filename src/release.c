@@ -211,7 +211,9 @@ dfs_release(const char *path,
 
         if (pe) {
                 pentry_set_flag(pe, FLAG_CLEAN);
+                LOG("pentry_unlock(fd=%d)..", pentry_get_fd(pe));
                 (void)pentry_unlock(pe);
+                LOG("pentry_unlock(fd=%d) finished!", pentry_get_fd(pe));
         }
 
         if (zlocal && -1 == unlink(zlocal))

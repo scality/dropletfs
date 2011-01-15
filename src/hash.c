@@ -1,10 +1,14 @@
 #include <assert.h>
 #include <pthread.h>
 #include <errno.h>
+#include <glib.h>
 
 #include "log.h"
 #include "hash.h"
 #include "metadata.h"
+
+
+extern GHashTable *hash;
 
 
 /* path entry on remote storage file system */
@@ -158,4 +162,20 @@ pentry_get_digest(pentry_t *pe)
         assert(pe);
 
         return pe->digest;
+}
+
+
+static void
+print(void *key, void *data, void *user_data)
+{
+        char *path = key;
+        pentry_t *pe = data;
+        LOG("key=%s, fd=%d, digest=%.*s",
+            path, pe->fd, MD5_DIGEST_LENGTH, pe->digest);
+}
+
+void
+hash_print_all(void)
+{
+        g_hash_table_foreach(hash, print, NULL);
 }

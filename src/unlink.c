@@ -34,12 +34,10 @@ dfs_unlink(const char *path)
                 LOG("unlink cache file (%s): %s", local, strerror(errno));
 
         pe = g_hash_table_lookup(hash, path);
-        if (! pe) {
+        if (! pe)
                 LOG("path entry not found");
-        } else {
-                pentry_free(pe);
+        else
                 g_hash_table_remove(hash, path);
-        }
 
         return 0;
 }

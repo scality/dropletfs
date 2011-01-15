@@ -14,6 +14,7 @@ dfs_open(const char *path,
          struct fuse_file_info *info)
 {
         pentry_t *pe = NULL;
+        char *key = NULL;
         char *file = NULL;
         int fd = -1;
         int ret = -1;
@@ -30,18 +31,26 @@ dfs_open(const char *path,
                         goto err;
                 }
                 pentry_set_fd(pe, -1);
+                key = strdup(path);
+                if (! key) {
+                        LOG("strdup(%s): %s", path, strerror(errno));
+                        pentry_free(pe);
+                        goto err;
+                }
+                g_hash_table_insert(hash, key, pe);
         } else {
                 fd = pentry_get_fd(pe);
                 LOG("'%s': found in the hashtable, fd=%d", path, fd);
         }
 
         /* unlock the file on release() */
+        LOG("pentry_lock(fd=%d)..", fd);
         if (pentry_lock(pe)) {
-                pentry_free(pe);
+                LOG("pentry_lock(%d) failed: %s", fd, strerror(errno));
                 ret = -1;
                 goto err;
-
         }
+        LOG("pentry_lock(fd=%d) finished!", fd);
 
         info->fh = (uint64_t)pe;
         file = build_cache_tree(path);
@@ -54,7 +63,6 @@ dfs_open(const char *path,
 
         /* open in order to write on remote fs */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
-                /* TODO: handle the case where we overwrite a file */
                 LOG("opening cache file '%s'", file);
                 fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
                 if (-1 == fd) {
@@ -65,6 +73,7 @@ dfs_open(const char *path,
                 pentry_set_fd(pe, fd);
         } else {
                 fd = pentry_get_fd(pe);
+
                 /* otherwise we simply want to read the file */
                 if (fd < 0) {
                         fd = dfs_get_local_copy(pe, path);
@@ -77,8 +86,6 @@ dfs_open(const char *path,
         }
 
         ret = 0;
-        g_hash_table_insert(hash, (gpointer)path, pe);
-
   err:
         LOG("@pentry=%p, fd=%d, flags=0x%X, ret=%d", pe, fd, info->flags, ret);
         return ret;
