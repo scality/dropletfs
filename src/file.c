@@ -36,8 +36,6 @@ write_all(int fd,
 
 	ssize_t cc;
 	int remain;
-        int tries = 0;
-        int delay = 1;
 
 	remain = len;
 	while (1) {
@@ -46,14 +44,6 @@ write_all(int fd,
 		if (-1 == cc) {
 			if (EINTR == errno)
 				goto again;
-                        if ((tries < max_retry) &&
-                            (EAGAIN == errno || EWOULDBLOCK == errno)) {
-                                LOG("write: timeout?");
-                                tries++;
-                                sleep(delay);
-                                delay *= 2;
-                                goto again;
-                        }
 			return -1;
 		}
 
