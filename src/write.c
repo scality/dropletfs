@@ -25,9 +25,6 @@ dfs_write(const char *path,
                 return EBADF;
         }
 
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
-            path, (void *)buf, size, (long long)offset, fd);
-
         ret = pwrite(fd, buf, size, offset);
         if (-1 == ret) {
                 LOG("pwrite: %s", strerror(errno));
