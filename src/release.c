@@ -23,34 +23,17 @@ extern int max_retry;
  * ret > 0 -> everything's ok
  *
  */
-static ssize_t
-compress_before_sending(char *local,
-                        char *zlocal,
+static int
+compress_before_sending(FILE *fpsrc,
+                        FILE *fpdst,
                         dpl_dict_t *dict,
-                        int *fd)
+                        size_t *size)
 {
-        FILE *fpsrc = NULL;
-        FILE *fpdst = NULL;
         int zfd;
         struct stat zst;
         dpl_status_t rc;
         ssize_t ret;
         int zrc;
-
-        fpsrc = fopen(local, "r");
-        if (! fpsrc) {
-                LOG("fopen: %s", strerror(errno));
-                ret = -1;
-                goto end;
-        }
-
-        fpdst = fopen(zlocal, "w+");
-        if (! fpdst) {
-                LOG("fopen: %s", strerror(errno));
-                LOG("send the file uncompressed");
-                ret = 0;
-                goto end;
-        }
 
         LOG("start compression before upload");
         zrc = zip(fpsrc, fpdst, zlib_level);
@@ -87,19 +70,12 @@ compress_before_sending(char *local,
                 goto end;
         }
 
-        ret = 0;
+        ret = zfd;
 
-        if (fd) {
-                ret = zst.st_size;
-                *fd = zfd;
-        }
+        if (size)
+                *size = zst.st_size;
 
   end:
-        if (fpsrc)
-                fclose(fpsrc);
-
-        if (fpdst)
-                fclose(fpdst);
 
         LOG("return value=%zd", ret);
         return ret;
@@ -117,11 +93,14 @@ dfs_release(const char *path,
         dpl_dict_t *dict = NULL;
         struct stat st;
         int ret = 0;
-        size_t size;
-        ssize_t zsize;
+        size_t size = 0;
+        size_t zsize = 0;
         int fd = -1;
+        int zfd = -1;
         char *local = NULL;
         char *zlocal = NULL;
+        FILE *fpsrc = NULL;
+        FILE *fpdst = NULL;
         int tries = 0;
         int delay = 1;
 
@@ -159,17 +138,35 @@ dfs_release(const char *path,
 
         if (0 == strncasecmp(compression_method, "zlib", strlen("zlib"))) {
                 zlocal = tmpstr_printf("%s.tmp", local);
-                zsize = compress_before_sending(local, zlocal, dict, &fd);
+
+                fpsrc = fopen(local, "r");
+                if (! fpsrc) {
+                        LOG("fopen: %s", strerror(errno));
+                        ret = -1;
+                        goto err;
+                }
+
+                fpdst = fopen(zlocal, "w+");
+                if (! fpdst) {
+                        LOG("fopen: %s", strerror(errno));
+                        LOG("send the file uncompressed");
+                        ret = 0;
+                        goto retry;
+                }
+
+                zfd = compress_before_sending(fpsrc, fpdst, dict, &zsize);
 
                 /* error in source file, don't upload it */
-                if (zsize < 0) {
+                if (zfd < 0) {
                         ret = -1;
                         goto err;
                 }
 
                 /* file correctly compressed, send it */
-                if (zsize > 0)
+                if (zfd > 0) {
                         size = zsize;
+                        fd = zfd;
+                }
         }
 
  retry:
@@ -200,7 +197,7 @@ dfs_release(const char *path,
         }
 
   err:
-        if (-1 != fd) {
+        if (-1 != fd && zfd != fd) {
                 if(-1 == lseek(fd, SEEK_SET, 0)) {
                         LOG("lseek(fd=%d, SEEK_SET, 0): %s",
                             fd, strerror(errno));
@@ -235,6 +232,12 @@ dfs_release(const char *path,
                 (void)pentry_unlock(pe);
                 LOG("pentry_unlock(fd=%d) finished!", pentry_get_fd(pe));
         }
+
+        if (fpsrc)
+                fclose(fpsrc);
+
+        if (fpdst)
+                fclose(fpdst);
 
         if (zlocal && -1 == unlink(zlocal))
                 LOG("unlink: %s", strerror(errno));
