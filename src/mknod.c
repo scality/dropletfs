@@ -17,9 +17,9 @@ dfs_mknod(const char *path,
 
         LOG("%s, mode=0x%X", path, (unsigned)mode);
 
+ retry:
         rc = dpl_mknod(ctx, (char *)path);
 
- retry:
         if (DPL_SUCCESS != rc) {
                 if (tries < max_retry) {
                         LOG("mknod: timeout? (%s)", dpl_status_str(rc));
