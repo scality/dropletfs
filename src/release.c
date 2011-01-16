@@ -37,12 +37,6 @@ compress_before_sending(char *local,
         ssize_t ret;
         int zrc;
 
-        if (strncasecmp(compression_method, "zlib", strlen("zlib"))) {
-                LOG("compression = '%s' - do not compress", compression_method);
-                ret = 0;
-                goto end;
-        }
-
         fpsrc = fopen(local, "r");
         if (! fpsrc) {
                 LOG("fopen: %s", strerror(errno));
@@ -162,17 +156,21 @@ dfs_release(const char *path,
         fill_metadata_from_stat(dict, &st);
 
         local = tmpstr_printf("%s/%s", cache_dir, path);
-        zlocal = tmpstr_printf("%s.tmp", local);
 
-        zsize = compress_before_sending(local, zlocal, dict, &fd);
+        if (0 == strncasecmp(compression_method, "zlib", strlen("zlib"))) {
+                zlocal = tmpstr_printf("%s.tmp", local);
+                zsize = compress_before_sending(local, zlocal, dict, &fd);
 
-        /* error in source file, don't upload it */
-        if (zsize < 0)
-                goto err;
+                /* error in source file, don't upload it */
+                if (zsize < 0) {
+                        ret = -1;
+                        goto err;
+                }
 
-        /* file correctly compressed, send it */
-        if (zsize > 0)
-                size = zsize;
+                /* file correctly compressed, send it */
+                if (zsize > 0)
+                        size = zsize;
+        }
 
  retry:
         rc = dpl_openwrite(ctx,
@@ -188,6 +186,7 @@ dfs_release(const char *path,
                         tries++;
                         sleep(delay);
                         delay *= 2;
+                        LOG("dpl_openwrite timeout? (delay=%d)", delay);
                         goto retry;
                 }
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
