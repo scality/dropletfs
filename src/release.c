@@ -211,8 +211,23 @@ dfs_release(const char *path,
         if (dict)
                 dpl_dict_free(dict);
 
-        if (vfile)
-                dpl_close(vfile);
+        if (vfile) {
+                tries = 0;
+                delay = 1;
+          retry_close:
+                rc = dpl_close(vfile);
+                if (DPL_SUCCESS != rc) {
+                        if (tries < max_retry) {
+                                tries++;
+                                sleep(delay);
+                                delay *= 2;
+                                LOG("dpl_close timeout? (delay=%d)", delay);
+                                goto retry_close;
+                        }
+                        LOG("dpl_close: %s", dpl_status_str(rc));
+                        ret = -1;
+                }
+        }
 
         if (pe) {
                 pentry_set_flag(pe, FLAG_CLEAN);
