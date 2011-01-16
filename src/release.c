@@ -200,8 +200,13 @@ dfs_release(const char *path,
         }
 
   err:
-        if (-1 != fd)
-                lseek(fd, SEEK_SET, 0);
+        if (-1 != fd) {
+                if(-1 == lseek(fd, SEEK_SET, 0)) {
+                        LOG("lseek(fd=%d, SEEK_SET, 0): %s",
+                            fd, strerror(errno));
+                        ret = -1;
+                }
+        }
 
         if (dict)
                 dpl_dict_free(dict);
