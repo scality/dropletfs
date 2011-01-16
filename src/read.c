@@ -26,9 +26,6 @@ dfs_read(const char *path,
                 goto end;
         }
 
-        LOG("path=%s, buf=%p, size=%zu, offset=%lld, fd=%d",
-            path, (void *)buf, size, (long long)offset, fd);
-
         ret = pread(fd, buf, size, offset);
 
         if (-1 == ret) {
