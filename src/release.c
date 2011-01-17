@@ -172,7 +172,7 @@ dfs_release(const char *path,
                 }
         }
 
- retry:
+  retry:
         vfile = NULL;
         LOG("calling dpl_openwrite");
         rc = dpl_openwrite(ctx,

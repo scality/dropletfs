@@ -10,7 +10,7 @@
 #include "metadata.h"
 #include "zip.h"
 
-#define WRITE_BLOCK_SIZE (1000*1000) 
+#define WRITE_BLOCK_SIZE (1000*1000)
 
 extern unsigned long zlib_level;
 extern char *cache_dir;
@@ -59,12 +59,12 @@ write_all(int fd,
 
 int
 read_write_all_vfile(int fd,
-         dpl_vfile_t *vfile)
+                     dpl_vfile_t *vfile)
 {
         dpl_status_t rc = DPL_FAILURE;
         int blksize = WRITE_BLOCK_SIZE;
         char *buf = NULL;
-        
+
         LOG("fd=%d", fd);
         buf = alloca(blksize);
         while (1) {
@@ -78,11 +78,11 @@ read_write_all_vfile(int fd,
                         break;
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
-		  LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
-		  return -1;
+                        LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
+                        return -1;
                 }
         }
-	
+
         return 0;
 }
 
@@ -125,7 +125,7 @@ dfs_md5cmp(pentry_t *pe,
                 goto err;
         }
 
- namei_retry:
+  namei_retry:
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
         if (DPL_ENOENT == rc) {
                 if (DPL_ENOENT != rc && (tries < max_retry)) {
