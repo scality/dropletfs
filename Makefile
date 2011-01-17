@@ -32,16 +32,15 @@ OBJ= $(SRC:.c=.o)
 
 DEST=/usr/local/bin
 
-bin=dplfs
+bin=bin/dplfs
 
 CC=/usr/bin/gcc
 
 all: $(bin)
 
-# since git can't add an empty dir (see the git faq), let's do it there...
-dplfs: $(OBJ)
+bin/dplfs: $(OBJ)
 	mkdir -p bin
-	$(CC) -o bin/$@ $^ $(LDFLAGS)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -53,10 +52,9 @@ clear:
 
 clean:
 	rm -f $(OBJ) *~ $(bin)
-	rm -f bin/*
 
 uninstall:
 	rm -f $(DEST)/$(bin)
 
 install:
-	install -m755 bin/$(bin) $(DEST)
+	install -m755 $(bin) $(DEST)
