@@ -33,6 +33,10 @@ set_default_stat(struct stat *st, dpl_ftype_t type)
 }
 
 
+/*
+ * return 0 if we have to grab local stat info
+ * return -1 if we have to call dpl_getattr() on remote object
+ */
 static int
 dfs_getattr_cached(pentry_t *pe,
                    struct stat *st)
@@ -46,8 +50,9 @@ dfs_getattr_cached(pentry_t *pe,
         /* if the flag is CLEAN, then the file was successfully uploaded,
          * just grab its metadata */
         if (FLAG_CLEAN == pentry_get_flag(pe)) {
-                LOG("file upload isn't finished yet");
+                LOG("file upload is finished");
                 ret = -1;
+                goto end;
         }
 
         /* otherwise, use the `struct stat' info of local cache file
@@ -55,12 +60,12 @@ dfs_getattr_cached(pentry_t *pe,
         if (-1 == fstat(fd, st)) {
                 LOG("fstat: %s", strerror(errno));
                 ret = -1;
-                goto err;
+                goto end;
         }
 
         LOG("use the cache file descriptor (%d) to fill struct stat", fd);
         ret = 0;
-  err:
+  end:
         return ret;
 }
 
@@ -81,16 +86,16 @@ dfs_getattr(const char *path,
 
         memset(st, 0, sizeof *st);
 
-        /* if the file isn't fully uploaded, get its metadata */
         pe = g_hash_table_lookup(hash, path);
         if (pe) {
-                if (! dfs_getattr_cached(pe, st))  {
+                /* if the file isn't fully uploaded, get its metadata */
+                if (0 == dfs_getattr_cached(pe, st))  {
                         ret = 0;
                         goto end;
                 }
         }
 
-        LOG("we have to retrieve metadata to check synchronization");
+        LOG("we have to retrieve remote metadata to check synchronization");
 
         /*
          * why setting st_nlink to 1?

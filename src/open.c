@@ -19,7 +19,7 @@ dfs_open(const char *path,
         int fd = -1;
         int ret = -1;
 
-        LOG("%s", path);
+        LOG("path=%s", path);
         PRINT_FLAGS(path, info);
 
         pe = g_hash_table_lookup(hash, path);
@@ -63,7 +63,7 @@ dfs_open(const char *path,
                 goto err;
         }
 
-        /* open in order to write on remote fs */
+        /* open in order to write on remote storage */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
                 LOG("opening cache file '%s'", file);
                 fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
@@ -73,10 +73,12 @@ dfs_open(const char *path,
                         goto err;
                 }
                 pentry_set_fd(pe, fd);
+                pentry_set_flag(pe, FLAG_DIRTY);
         } else {
+                /* get the fd of the file we want to read */
                 fd = pentry_get_fd(pe);
 
-                /* otherwise we simply want to read the file */
+                /* negative fd? then we don't have any cache file, get it! */
                 if (fd < 0) {
                         fd = dfs_get_local_copy(pe, path);
                         if (-1 == fd) {

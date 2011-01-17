@@ -65,9 +65,9 @@ read_all(int fd,
         int tries = 0;
         int delay = 1;
 
+        LOG("fd=%d", fd);
         buf = alloca(blksize);
-        while (1)
-        {
+        while (1) {
                 int r = read(fd, buf, blksize);
                 if (-1 == r) {
                         LOG("read on fd=%d %s", fd, strerror(errno));
@@ -83,7 +83,8 @@ read_all(int fd,
                                 tries++;
                                 sleep(delay);
                                 delay *= 2;
-                                LOG("dpl_write timeout? (delay=%d)", delay);
+                                LOG("dpl_write timeout? (fd=%d, delay=%d)",
+                                    fd, delay);
                                 goto retry_write;
                         }
                         LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
