@@ -57,7 +57,9 @@ pentry_free(pentry_t *pe)
         if (-1 != pe->fd)
                 close(pe->fd);
 
-        dpl_dict_free(pe->metadata);
+        if (pe->metadata)
+                dpl_dict_free(pe->metadata);
+
         (void)pthread_mutex_destroy(&pe->mutex);
 
         free(pe);
