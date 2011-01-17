@@ -232,14 +232,6 @@ dfs_release(const char *path,
                 LOG("unlink: %s", strerror(errno));
 
   end:
-        if (-1 != fd && zfd != fd) {
-                if(-1 == lseek(fd, SEEK_SET, 0)) {
-                        LOG("lseek(fd=%d, SEEK_SET, 0): %s",
-                            fd, strerror(errno));
-                        ret = -1;
-                }
-        }
-
         LOG("return value=%d", ret);
         return ret;
 }
