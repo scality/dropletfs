@@ -13,8 +13,7 @@ CPPFLAGS+=
 LDFLAGS+=-ldroplet -lssl -lxml2 $(FUSE_LDFLAGS) $(GLIB_LDFLAGS) -L$(DPL_LIB_DIR)
 
 CFLAGS+=-Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
-CFLAGS+=-Wno-unused-parameter
-CFLAGS+=-Wall -Wextra -Werror
+CFLAGS+=-Wall -Werror
 CFLAGS+=-Wformat-nonliteral -Wcast-align -Wpointer-arith
 CFLAGS+=-Wbad-function-cast -Wmissing-prototypes -Wstrict-prototypes
 CFLAGS+=-Wmissing-declarations
