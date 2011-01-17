@@ -105,6 +105,7 @@ dfs_release(const char *path,
         int delay = 1;
 
         LOG("path=%s", path);
+        PRINT_FLAGS(path, info);
 
         pe = (pentry_t *)info->fh;
         if (! pe) {
@@ -127,8 +128,10 @@ dfs_release(const char *path,
 
         /* We opened a file but we do not want to update it on the server since
          * it was only for read-only purposes */
-        if (O_RDONLY == (info->flags & O_ACCMODE))
-                goto err;
+        if (O_RDONLY == (info->flags & O_ACCMODE)) {
+                LOG("fd=%d was opened with O_RDONLY mode", fd);
+                goto end;
+        }
 
         size = st.st_size;
         dict = dpl_dict_new(13);
@@ -170,6 +173,8 @@ dfs_release(const char *path,
         }
 
  retry:
+        vfile = NULL;
+        LOG("calling dpl_openwrite");
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
@@ -180,10 +185,11 @@ dfs_release(const char *path,
 
         if (DPL_SUCCESS != rc) {
                 if (rc != DPL_ENOENT && (tries < max_retry)) {
+                        LOG("dpl_openwrite timeout? (delay=%d, vfile@%p)",
+                            delay, (void *)vfile);
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG("dpl_openwrite timeout? (delay=%d)", delay);
                         goto retry;
                 }
                 LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
@@ -191,36 +197,19 @@ dfs_release(const char *path,
                 goto err;
         }
 
+        LOG("calling read_all(fd=%d, vfile=%p)", fd, (void *)vfile);
         if (-1 == read_all(fd, vfile)) {
                 ret = -1;
                 goto err;
         }
 
   err:
-        if (-1 != fd && zfd != fd) {
-                if(-1 == lseek(fd, SEEK_SET, 0)) {
-                        LOG("lseek(fd=%d, SEEK_SET, 0): %s",
-                            fd, strerror(errno));
-                        ret = -1;
-                }
-        }
-
         if (dict)
                 dpl_dict_free(dict);
 
         if (vfile) {
-                tries = 0;
-                delay = 1;
-          retry_close:
                 rc = dpl_close(vfile);
                 if (DPL_SUCCESS != rc) {
-                        if (tries < max_retry) {
-                                tries++;
-                                sleep(delay);
-                                delay *= 2;
-                                LOG("dpl_close timeout? (delay=%d)", delay);
-                                goto retry_close;
-                        }
                         LOG("dpl_close: %s", dpl_status_str(rc));
                         ret = -1;
                 }
@@ -241,6 +230,15 @@ dfs_release(const char *path,
 
         if (zlocal && -1 == unlink(zlocal))
                 LOG("unlink: %s", strerror(errno));
+
+  end:
+        if (-1 != fd && zfd != fd) {
+                if(-1 == lseek(fd, SEEK_SET, 0)) {
+                        LOG("lseek(fd=%d, SEEK_SET, 0): %s",
+                            fd, strerror(errno));
+                        ret = -1;
+                }
+        }
 
         LOG("return value=%d", ret);
         return ret;
