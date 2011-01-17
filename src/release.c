@@ -197,8 +197,8 @@ dfs_release(const char *path,
                 goto err;
         }
 
-        LOG("calling read_all(fd=%d, vfile=%p)", fd, (void *)vfile);
-        if (-1 == read_all(fd, vfile)) {
+        LOG("calling read_write_all_vfile(fd=%d, vfile=%p)", fd, (void *)vfile);
+        if (-1 == read_write_all_vfile(fd, vfile)) {
                 ret = -1;
                 goto err;
         }

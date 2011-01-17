@@ -10,6 +10,8 @@
 #include "metadata.h"
 #include "zip.h"
 
+#define WRITE_BLOCK_SIZE (1000*1000) 
+
 extern unsigned long zlib_level;
 extern char *cache_dir;
 extern int max_retry;
@@ -56,15 +58,13 @@ write_all(int fd,
 }
 
 int
-read_all(int fd,
+read_write_all_vfile(int fd,
          dpl_vfile_t *vfile)
 {
         dpl_status_t rc = DPL_FAILURE;
-        static int blksize = 4096;
+        int blksize = WRITE_BLOCK_SIZE;
         char *buf = NULL;
-        int tries = 0;
-        int delay = 1;
-
+        
         LOG("fd=%d", fd);
         buf = alloca(blksize);
         while (1) {
@@ -76,22 +76,13 @@ read_all(int fd,
 
                 if (0 == r)
                         break;
-        retry_write:
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
-                        if (tries < max_retry) {
-                                tries++;
-                                sleep(delay);
-                                delay *= 2;
-                                LOG("dpl_write timeout? (fd=%d, delay=%d)",
-                                    fd, delay);
-                                goto retry_write;
-                        }
-                        LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
-                        return -1;
+		  LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
+		  return -1;
                 }
         }
-
+	
         return 0;
 }
 

@@ -13,7 +13,7 @@ struct get_data {
 
 char *dfs_ftypetostr(dpl_ftype_t);
 int write_all(int, char *, int);
-int read_all(int, dpl_vfile_t *);
+int read_write_all_vfile(int, dpl_vfile_t *);
 int cb_get_buffered(void *, char *, unsigned);
 char *build_cache_tree(const char *);
 /* return the fd of a local copy, to operate on */
