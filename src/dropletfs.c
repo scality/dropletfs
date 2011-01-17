@@ -411,7 +411,9 @@ set_compression_env(void)
                         compression_method = DEFAULT_COMPRESSION_METHOD;
                 else
                         compression_method = tmp;
-        }
+        } else {
+	  compression_method = DEFAULT_COMPRESSION_METHOD;
+	}
 
         tmp = getenv("DROPLETFS_ZLIB_LEVEL");
         LOG("DROPLETFS_ZLIB_LEVEL=%s", tmp);
