@@ -489,7 +489,7 @@ main(int argc, char **argv)
 	if (! ctx)
                 goto err2;
 
-        ctx->trace_level = ~0;
+        ctx->trace_level = 0;
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
