@@ -15,7 +15,7 @@ extern char *cache_dir;
 extern int max_retry;
 
 /*
- * compress a file, return its size and set `fd' to its file descriptor value
+ * compress a file,  set `size' to the resulting file size
  *
  * return the size of the compressed file
  * ret = 0 -> no compression
@@ -130,9 +130,9 @@ dfs_release(const char *path,
         pentry_dec_refcount(pe);
 
         /* We opened a file but we do not want to update it on the server since
-         * it was only for read-only purposes */
+         * it was for read-only purposes */
         if (O_RDONLY == (info->flags & O_ACCMODE)) {
-                LOG(LOG_DEBUG, "fd=%d was opened with O_RDONLY mode", fd);
+                LOG(LOG_DEBUG, "fd=%d was opened in O_RDONLY mode", fd);
                 ret = 0;
                 goto end;
         }
