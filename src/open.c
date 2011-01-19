@@ -39,6 +39,53 @@ populate_hash(GHashTable *h,
         return ret;
 }
 
+static int
+open_read_only(const char * const path,
+               pentry_t *pe)
+{
+        int ret;
+        int fd;
+
+        LOG(LOG_INFO, "opening cache file '%s'", path);
+        fd = open(path, O_RDWR|O_CREAT|O_TRUNC, 0644);
+        if (-1 == fd) {
+                LOG(LOG_ERR, "%s: %s", path, strerror(errno));
+                ret = -1;
+                goto err;
+        }
+        pentry_set_fd(pe, fd);
+        pentry_set_flag(pe, FLAG_DIRTY);
+
+        ret = 0;
+  err:
+        return ret;
+}
+
+static int
+open_read_write(const char * const path,
+                pentry_t *pe)
+{
+        int ret;
+        int fd;
+
+        /* get the fd of the file we want to read */
+        fd = pentry_get_fd(pe);
+
+        /* negative fd? then we don't have any cache file, get it! */
+        if (fd < 0) {
+                fd = dfs_get_local_copy(pe, path);
+                if (-1 == fd) {
+                        ret = -1;
+                        goto err;
+                }
+                pentry_set_fd(pe, fd);
+        }
+
+        ret = 0;
+  err:
+        return ret;
+}
+
 int
 dfs_open(const char *path,
          struct fuse_file_info *info)
@@ -77,35 +124,20 @@ dfs_open(const char *path,
         file = build_cache_tree(path);
 
         if (! file) {
-                LOG(LOG_ERR, "build_cache_tree(%s) was unable to build a path",
-                    path);
+                LOG(LOG_ERR, "can't create a cache file path (%s)", path);
                 ret = -1;
                 goto err;
         }
 
-        /* open in order to write on remote storage */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
-                LOG(LOG_INFO, "opening cache file '%s'", file);
-                fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
-                if (-1 == fd) {
-                        LOG(LOG_ERR, "%s: %s", file, strerror(errno));
+                if (-1 == open_read_write(file, pe)) {
                         ret = -1;
                         goto err;
                 }
-                pentry_set_fd(pe, fd);
-                pentry_set_flag(pe, FLAG_DIRTY);
         } else {
-                /* get the fd of the file we want to read */
-                fd = pentry_get_fd(pe);
-
-                /* negative fd? then we don't have any cache file, get it! */
-                if (fd < 0) {
-                        fd = dfs_get_local_copy(pe, path);
-                        if (-1 == fd) {
-                                ret = -1;
-                                goto err;
-                        }
-                        pentry_set_fd(pe, fd);
+                if (-1 == open_read_only(file, pe)) {
+                        ret = -1;
+                        goto err;
                 }
         }
 
