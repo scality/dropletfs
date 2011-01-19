@@ -180,6 +180,8 @@ build_cache_tree(const char *path)
 
         char *local = NULL;
         char *tmp_local = NULL;
+        char *dir = NULL;
+        struct stat st;
 
         /* ignore the leading spaces */
         while (path && '/' == *path)
@@ -190,11 +192,18 @@ build_cache_tree(const char *path)
         tmp_local = strdup(local);
 
         if (! tmp_local) {
-                LOG(LOG_ERR, "strdup: %s (%d)", strerror(errno), errno);
+                LOG(LOG_CRIT, "strdup(%s): %s", tmp_local, strerror(errno));
                 return NULL;
         }
 
-        mkdir_tree(dirname(tmp_local));
+        dir = tmpstr_printf("%s", dirname(tmp_local));
+        if (-1 == stat(dir, &st)) {
+                if (ENOENT == errno)
+                        mkdir_tree(dir);
+                else
+                        LOG(LOG_ERR, "stat(%s): %s", dir, strerror(errno));
+        }
+
         free(tmp_local);
 
         return local;
