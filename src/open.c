@@ -19,12 +19,12 @@ dfs_open(const char *path,
         int fd = -1;
         int ret = -1;
 
-        LOG("path=%s", path);
+        LOG(LOG_DEBUG, "path=%s", path);
         PRINT_FLAGS(path, info);
 
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
-                LOG("'%s': entry not found in hashtable", path);
+                LOG(LOG_INFO, "'%s': entry not found in hashtable", path);
                 pe = pentry_new();
                 if (! pe) {
                         ret = -1;
@@ -33,15 +33,15 @@ dfs_open(const char *path,
                 pentry_set_fd(pe, -1);
                 key = strdup(path);
                 if (! key) {
-                        LOG("strdup(%s): %s", path, strerror(errno));
+                        LOG(LOG_CRIT, "strdup(%s): %s", path, strerror(errno));
                         pentry_free(pe);
                         goto err;
                 }
-                LOG("adding file '%s' to the hashtable", path);
+                LOG(LOG_INFO, "adding file '%s' to the hashtable", path);
                 g_hash_table_insert(hash, key, pe);
         } else {
                 fd = pentry_get_fd(pe);
-                LOG("'%s': found in the hashtable, fd=%d", path, fd);
+                LOG(LOG_INFO, "'%s': found in the hashtable, fd=%d", path, fd);
         }
 
         pentry_inc_refcount(pe);
@@ -57,17 +57,18 @@ dfs_open(const char *path,
         file = build_cache_tree(path);
 
         if (! file) {
-                LOG("build_cache_tree(%s) was unable to build a path", path);
+                LOG(LOG_ERR, "build_cache_tree(%s) was unable to build a path",
+                    path);
                 ret = -1;
                 goto err;
         }
 
         /* open in order to write on remote storage */
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
-                LOG("opening cache file '%s'", file);
+                LOG(LOG_INFO, "opening cache file '%s'", file);
                 fd = open(file, O_RDWR|O_CREAT|O_TRUNC, 0644);
                 if (-1 == fd) {
-                        LOG("%s: %s", file, strerror(errno));
+                        LOG(LOG_ERR, "%s: %s", file, strerror(errno));
                         ret = -1;
                         goto err;
                 }
@@ -90,6 +91,7 @@ dfs_open(const char *path,
 
         ret = 0;
   err:
-        LOG("@pentry=%p, fd=%d, flags=0x%X, ret=%d", pe, fd, info->flags, ret);
+        LOG(LOG_DEBUG, "@pentry=%p, fd=%d, flags=0x%X, ret=%d",
+            pe, fd, info->flags, ret);
         return ret;
 }

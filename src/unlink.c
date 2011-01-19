@@ -21,23 +21,24 @@ dfs_unlink(const char *path)
         pentry_t *pe = NULL;
         int ret;
 
-        LOG("path=%s", path);
+        LOG(LOG_DEBUG, "path=%s", path);
 
         rc = dpl_unlink(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_unlink: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_unlink: %s", dpl_status_str(rc));
                 ret = 1;
                 goto end;
         }
 
         local = tmpstr_printf("%s/%s", cache_dir, path);
         if (-1 == unlink(local))
-                LOG("unlink cache file (%s): %s", local, strerror(errno));
+                LOG(LOG_INFO, "unlink cache file (%s): %s",
+                    local, strerror(errno));
 
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
-                LOG("path entry not found");
+                LOG(LOG_ERR, "path entry not found");
                 ret = 0;
                 goto end;
         }
@@ -48,7 +49,8 @@ dfs_unlink(const char *path)
                  * a filesystem point of view, we do not want to return
                  * an error
                  */
-                LOG("%s: can't remove the cell from the hashtable", path);
+                LOG(LOG_NOTICE, "%s: can't remove the cell from the hashtable",
+                    path);
 
         ret = 0;
  end:

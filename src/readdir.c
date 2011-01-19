@@ -15,20 +15,20 @@ dfs_readdir(const char *path,
         dpl_dirent_t dirent;
         dpl_status_t rc = DPL_FAILURE;
 
-        LOG("path=%s, data=%p, fill=%p, offset=%lld, info=%p",
+        LOG(LOG_DEBUG, "path=%s, data=%p, fill=%p, offset=%lld, info=%p",
             path, data, (void *)fill, (long long)offset, (void *)info);
 
         rc = dpl_chdir(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_chdir: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_chdir: %s", dpl_status_str(rc));
                 return rc;
         }
 
         rc = dpl_opendir(ctx, ".", &dir_hdl);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_opendir: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_opendir: %s", dpl_status_str(rc));
                 return rc;
         }
 

@@ -17,23 +17,26 @@ dfs_write(const char *path,
         int ret = 0;
         int fd = -1;
 
+        LOG(LOG_DEBUG, "path=%s, buf=%p, size=%zu, offset=%lld, info=%p",
+            path, (void *)buf, size, (long long)offset, (void *)info);
+
         pe = (pentry_t *)info->fh;
 
         fd = pentry_get_fd(pe);
         if (fd < 0) {
-                LOG("unusable file descriptor fd=%d", fd);
+                LOG(LOG_ERR, "unusable file descriptor fd=%d", fd);
                 ret = EBADF;
                 goto err;
         }
 
         ret = pwrite(fd, buf, size, offset);
         if (-1 == ret) {
-                LOG("pwrite: %s", strerror(errno));
+                LOG(LOG_ERR, "pwrite: %s", strerror(errno));
                 ret = -errno;
                 goto err;
         }
 
   err:
-        LOG("return value = %d", ret);
+        LOG(LOG_DEBUG, "return value = %d", ret);
         return ret;
 }

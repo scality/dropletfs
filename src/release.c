@@ -35,10 +35,10 @@ compress_before_sending(FILE *fpsrc,
         ssize_t ret;
         int zrc;
 
-        LOG("start compression before upload");
+        LOG(LOG_INFO, "start compression before upload");
         zrc = zip(fpsrc, fpdst, zlib_level);
         if (Z_OK != zrc) {
-                LOG("zip failed: %s", zerr_to_str(zrc));
+                LOG(LOG_ERR, "zip failed: %s", zerr_to_str(zrc));
                 ret = 0;
                 goto end;
         }
@@ -46,26 +46,26 @@ compress_before_sending(FILE *fpsrc,
         fflush(fpdst);
         zfd = fileno(fpdst);
         if (-1 == zfd) {
-                LOG("fileno: %s", strerror(errno));
-                LOG("send the file uncompressed");
+                LOG(LOG_ERR, "fileno: %s", strerror(errno));
+                LOG(LOG_NOTICE, "send the file uncompressed");
                 ret = 0;
                 goto end;
         }
 
         if (-1 == fstat(zfd, &zst)) {
-                LOG("fstat: %s", strerror(errno));
+                LOG(LOG_ERR, "fstat: %s", strerror(errno));
                 ret = 0;
                 goto end;
         }
 
         /* please rewind before sending the data */
         lseek(zfd, 0, SEEK_SET);
-        LOG("compressed file: fd=%d, size=%llu",
+        LOG(LOG_INFO, "compressed file: fd=%d, size=%llu",
             zfd, (unsigned long long)zst.st_size);
 
         rc = dpl_dict_update_value(dict, "compression", "zlib");
         if (DPL_SUCCESS != rc) {
-                LOG("can't update metadata: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "can't update metadata: %s", dpl_status_str(rc));
                 ret = 0;
                 goto end;
         }
@@ -77,7 +77,7 @@ compress_before_sending(FILE *fpsrc,
 
   end:
 
-        LOG("return value=%zd", ret);
+        LOG(LOG_DEBUG, "return value=%zd", ret);
         return ret;
 
 }
@@ -105,25 +105,25 @@ dfs_release(const char *path,
         int tries = 0;
         int delay = 1;
 
-        LOG("path=%s", path);
+        LOG(LOG_DEBUG, "path=%s", path);
         PRINT_FLAGS(path, info);
 
         pe = (pentry_t *)info->fh;
         if (! pe) {
-                LOG("no path entry");
+                LOG(LOG_ERR, "no path entry");
                 goto err;
         }
 
         fd = pentry_get_fd(pe);
         if (fd < 0) {
-                LOG("unusable file descriptor fd=%d", fd);
+                LOG(LOG_ERR, "unusable file descriptor fd=%d", fd);
                 goto err;
         }
 
-        LOG("%s, fd=%d", path, fd);
+        LOG(LOG_DEBUG, "%s, fd=%d", path, fd);
 
         if (-1 == fstat(fd, &st)) {
-                LOG("fstat(%d, %p) = %s", fd, (void *)&st, strerror(errno));
+                LOG(LOG_ERR, "fstat(fd=%d) = %s", fd, strerror(errno));
                 goto err;
         }
 
@@ -132,7 +132,7 @@ dfs_release(const char *path,
         /* We opened a file but we do not want to update it on the server since
          * it was only for read-only purposes */
         if (O_RDONLY == (info->flags & O_ACCMODE)) {
-                LOG("fd=%d was opened with O_RDONLY mode", fd);
+                LOG(LOG_DEBUG, "fd=%d was opened with O_RDONLY mode", fd);
                 ret = 0;
                 goto end;
         }
@@ -149,15 +149,15 @@ dfs_release(const char *path,
 
                 fpsrc = fopen(local, "r");
                 if (! fpsrc) {
-                        LOG("fopen: %s", strerror(errno));
+                        LOG(LOG_ERR, "fopen: %s", strerror(errno));
                         ret = -1;
                         goto err;
                 }
 
                 fpdst = fopen(zlocal, "w+");
                 if (! fpdst) {
-                        LOG("fopen: %s", strerror(errno));
-                        LOG("send the file uncompressed");
+                        LOG(LOG_ERR, "fopen: %s", strerror(errno));
+                        LOG(LOG_NOTICE, "send the file uncompressed");
                         ret = 0;
                         goto retry;
                 }
@@ -179,7 +179,6 @@ dfs_release(const char *path,
 
   retry:
         vfile = NULL;
-        LOG("calling dpl_openwrite");
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
@@ -190,14 +189,15 @@ dfs_release(const char *path,
 
         if (DPL_SUCCESS != rc) {
                 if (rc != DPL_ENOENT && (tries < max_retry)) {
-                        LOG("dpl_openwrite timeout? (delay=%d, vfile@%p)",
+                        LOG(LOG_NOTICE,
+                            "dpl_openwrite timeout? (delay=%d, vfile@%p)",
                             delay, (void *)vfile);
                         tries++;
                         sleep(delay);
                         delay *= 2;
                         goto retry;
                 }
-                LOG("dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
+                LOG(LOG_ERR, "dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
                 ret = -1;
                 goto err;
         }
@@ -215,7 +215,7 @@ dfs_release(const char *path,
         if (vfile) {
                 rc = dpl_close(vfile);
                 if (DPL_SUCCESS != rc) {
-                        LOG("dpl_close: %s", dpl_status_str(rc));
+                        LOG(LOG_ERR, "dpl_close: %s", dpl_status_str(rc));
                         ret = -1;
                 }
         }
@@ -229,18 +229,19 @@ dfs_release(const char *path,
                 fclose(fpsrc);
 
         if (-1 == lseek(fd, 0, SEEK_SET))
-                LOG("lseek(fd=%d, 0, SEEK_SET): %s", fd, strerror(errno));
+                LOG(LOG_ERR, "lseek(fd=%d, 0, SEEK_SET): %s",
+                    fd, strerror(errno));
 
         if (fpdst)
                 fclose(fpdst);
 
         if (zlocal) {
-                LOG("removing cache file '%s'", zlocal);
+                LOG(LOG_INFO, "removing cache file '%s'", zlocal);
                 if (-1 == unlink(zlocal))
-                        LOG("unlink: %s", strerror(errno));
+                        LOG(LOG_ERR, "unlink: %s", strerror(errno));
         }
 
   end:
-        LOG("return value=%d", ret);
+        LOG(LOG_DEBUG, "return value=%d", ret);
         return ret;
 }

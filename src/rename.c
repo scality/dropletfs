@@ -15,7 +15,7 @@ dfs_rename(const char *oldpath,
         char *p = NULL;
         int ret = 0;
 
-        LOG("%s -> %s", oldpath, newpath);
+        LOG(LOG_DEBUG, "%s -> %s", oldpath, newpath);
 
         if (0 == strcmp(newpath, ".")) {
                 p = strrchr(oldpath, '/');
@@ -24,7 +24,7 @@ dfs_rename(const char *oldpath,
 
         rc = dpl_fcopy(ctx, (char *)oldpath, (char *)newpath);
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_fcopy: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_fcopy: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }

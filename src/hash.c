@@ -32,7 +32,7 @@ pentry_new(void)
 
         pe = malloc(sizeof *pe);
         if (! pe) {
-                LOG("out of memory");
+                LOG(LOG_CRIT, "out of memory");
                 return NULL;
         }
 
@@ -40,21 +40,21 @@ pentry_new(void)
 
         rc = sem_init(&pe->refcount, 0, 0);
         if (-1 == rc) {
-                LOG("sem_init sem@%p: %s",
+                LOG(LOG_INFO, "sem_init sem@%p: %s",
                     (void *)&pe->refcount, strerror(errno));
                 goto release;
         }
 
         rc = pthread_mutexattr_init(&attr);
         if (rc) {
-                LOG("pthread_mutexattr_init mutex@%p: %s",
+                LOG(LOG_INFO, "pthread_mutexattr_init mutex@%p: %s",
                     (void *)&pe->mutex, strerror(rc));
                 goto release;
         }
 
         rc = pthread_mutex_init(&pe->mutex, &attr);
         if (rc) {
-                LOG("pthread_mutex_init mutex@%p %s",
+                LOG(LOG_INFO, "pthread_mutex_init mutex@%p %s",
                     (void *)&pe->mutex, strerror(rc));
                 goto release;
         }
@@ -89,7 +89,8 @@ pentry_inc_refcount(pentry_t *pe)
 
 
         if (-1 == sem_post(&pe->refcount))
-                LOG("sem_post@%p: %s", (void *)&pe->refcount, strerror(errno));
+                LOG(LOG_INFO, "sem_post@%p: %s",
+                    (void *)&pe->refcount, strerror(errno));
 }
 
 void
@@ -99,7 +100,8 @@ pentry_dec_refcount(pentry_t *pe)
 
 
         if (-1 == sem_wait(&pe->refcount))
-                LOG("sem_wait@%p: %s", (void *)&pe->refcount, strerror(errno));
+                LOG(LOG_INFO, "sem_wait@%p: %s",
+                    (void *)&pe->refcount, strerror(errno));
 }
 
 int
@@ -122,7 +124,7 @@ pentry_trylock(pentry_t *pe)
 
         ret = pthread_mutex_trylock(&pe->mutex);
 
-        LOG("mutex@%p, fd=%d: %saquired",
+        LOG(LOG_DEBUG, "mutex@%p, fd=%d: %saquired",
             (void *)&pe->mutex, pe->fd, ret ? "not " : "");
 
         return ret;
@@ -137,9 +139,11 @@ pentry_lock(pentry_t *pe)
 
         ret = pthread_mutex_lock(&pe->mutex);
         if (ret)
-                LOG("mutex@%p: %s", (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "mutex@%p: %s",
+                    (void *)&pe->mutex, strerror(errno));
         else
-                LOG("mutex@%p, fd=%d: acquired", (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "mutex@%p, fd=%d: acquired",
+                    (void *)&pe->mutex, pe->fd);
 
 
         return ret;
@@ -154,9 +158,11 @@ pentry_unlock(pentry_t *pe)
 
         ret = pthread_mutex_unlock(&pe->mutex);
         if (ret)
-                LOG("mutex@%p: %s", (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "mutex@%p: %s",
+                    (void *)&pe->mutex, strerror(errno));
         else
-                LOG("mutex@%p, fd=%d: released", (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "mutex@%p, fd=%d: released",
+                    (void *)&pe->mutex, pe->fd);
 
         return ret;
 }
@@ -242,7 +248,7 @@ print(void *key, void *data, void *user_data)
 {
         char *path = key;
         pentry_t *pe = data;
-        LOG("key=%s, fd=%d, digest=%.*s",
+        LOG(LOG_DEBUG, "key=%s, fd=%d, digest=%.*s",
             path, pe->fd, MD5_DIGEST_LENGTH, pe->digest);
 }
 

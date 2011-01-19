@@ -34,7 +34,7 @@ write_all(int fd,
           char *buf,
           int len)
 {
-        LOG("fd=%d, len=%d", fd, len);
+        LOG(LOG_DEBUG, "fd=%d, len=%d", fd, len);
 
 	ssize_t cc;
 	int remain;
@@ -65,12 +65,13 @@ read_write_all_vfile(int fd,
         int blksize = WRITE_BLOCK_SIZE;
         char *buf = NULL;
 
-        LOG("fd=%d", fd);
+        LOG(LOG_DEBUG, "fd=%d", fd);
         buf = alloca(blksize);
         while (1) {
                 int r = read(fd, buf, blksize);
                 if (-1 == r) {
-                        LOG("read on fd=%d %s", fd, strerror(errno));
+                        LOG(LOG_ERR, "read (fd=%d): %s",
+                            fd, strerror(errno));
                         return -1;
                 }
 
@@ -78,7 +79,8 @@ read_write_all_vfile(int fd,
                         break;
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
-                        LOG("dpl_write: %s (%d)", dpl_status_str(rc), rc);
+                        LOG(LOG_ERR, "dpl_write: %s (%d)",
+                            dpl_status_str(rc), rc);
                         return -1;
                 }
         }
@@ -121,27 +123,28 @@ dfs_md5cmp(pentry_t *pe,
 
         digest = pentry_get_digest(pe);
         if (! digest) {
-                LOG("no digest");
+                LOG(LOG_DEBUG, "no digest");
                 goto err;
         }
 
   namei_retry:
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
-        if (DPL_ENOENT == rc) {
-                if (DPL_ENOENT != rc && (tries < max_retry)) {
+        if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
+                if (tries < max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG("namei timeout? (%s)", dpl_status_str(rc));
+                        LOG(LOG_NOTICE, "namei timeout? (%s)",
+                            dpl_status_str(rc));
                         goto namei_retry;
                 }
-                LOG("dpl_namei: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
                 goto err;
         }
 
         rc = dpl_head_all(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_head_all: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_head_all: %s", dpl_status_str(rc));
                 goto err;
         }
 
@@ -151,12 +154,12 @@ dfs_md5cmp(pentry_t *pe,
                 remote_md5 = dpl_dict_get_value(dict, "etag");
 
         if (remote_md5) {
-                LOG("remote md5=%s", remote_md5);
-                LOG("local md5=%.*s", MD5_DIGEST_LENGTH, digest);
+                LOG(LOG_DEBUG, "remote md5=%s", remote_md5);
+                LOG(LOG_DEBUG, "local md5=%.*s", MD5_DIGEST_LENGTH, digest);
                 diff = memcmp(digest, remote_md5, MD5_DIGEST_LENGTH);
                 if (diff) {
                         pentry_set_digest(pe, remote_md5);
-                        LOG("updated local md5=%.*s",
+                        LOG(LOG_DEBUG, "updated local md5=%.*s",
                             MD5_DIGEST_LENGTH, pentry_get_digest(pe));
                 }
         }
@@ -173,7 +176,7 @@ dfs_md5cmp(pentry_t *pe,
 char *
 build_cache_tree(const char *path)
 {
-        LOG("building cache dir for '%s'", path);
+        LOG(LOG_DEBUG, "building cache dir for '%s'", path);
 
         char *local = NULL;
         char *tmp_local = NULL;
@@ -187,7 +190,7 @@ build_cache_tree(const char *path)
         tmp_local = strdup(local);
 
         if (! tmp_local) {
-                LOG("strdup: %s (%d)", strerror(errno), errno);
+                LOG(LOG_ERR, "strdup: %s (%d)", strerror(errno), errno);
                 return NULL;
         }
 
@@ -214,7 +217,7 @@ handle_compression(const char *remote,
 
         compressed = dpl_dict_get_value(metadata, "compression");
         if (! compressed) {
-                LOG("%s: uncompressed remote file", remote);
+                LOG(LOG_INFO, "%s: uncompressed remote file", remote);
                 ret = 0;
                 goto end;
         }
@@ -222,13 +225,14 @@ handle_compression(const char *remote,
 #define NONE "none"
 #define ZLIB "zlib"
         if (0 == strncmp(compressed, NONE, strlen(NONE))) {
-                LOG("compression method: 'none'");
+                LOG(LOG_INFO, "compression method: 'none'");
                 ret = 0;
                 goto end;
         }
 
         if (0 != strncmp(compressed, ZLIB, strlen(ZLIB))) {
-                LOG("compression method not supported '%s'", compressed);
+                LOG(LOG_ERR, "compression method not supported '%s'",
+                    compressed);
                 ret = -1;
                 goto end;
         }
@@ -237,36 +241,36 @@ handle_compression(const char *remote,
 
         fpsrc = fopen(local, "r");
         if (! fpsrc) {
-                LOG("fopen: %s", strerror(errno));
+                LOG(LOG_ERR, "fopen: %s", strerror(errno));
                 ret = -1;
                 goto end;
         }
 
         fpdst = fopen(uzlocal, "w");
         if (! fpdst) {
-                LOG("fopen: %s", strerror(errno));
+                LOG(LOG_ERR, "fopen: %s", strerror(errno));
                 ret = -1;
                 goto end;
         }
 
-        LOG("uncompressing local file '%s'", local);
+        LOG(LOG_INFO, "uncompressing local file '%s'", local);
 
         zret = unzip(fpsrc, fpdst);
         if (Z_OK != zret) {
-                LOG("unzip failed: %s", zerr_to_str(zret));
+                LOG(LOG_ERR, "unzip failed: %s", zerr_to_str(zret));
                 ret = -1;
                 goto end;
         }
 
         rc = dpl_dict_update_value(metadata, "compression", "none");
         if (DPL_SUCCESS != rc) {
-                LOG("unable to update 'compression' metadata");
+                LOG(LOG_ERR, "unable to update 'compression' metadata");
                 ret = -1;
                 goto end;
         }
 
         if (-1 == rename(uzlocal, local)) {
-                LOG("rename: %s", strerror(errno));
+                LOG(LOG_ERR, "rename: %s", strerror(errno));
                 ret = 1;
                 goto end;
         }
@@ -274,7 +278,7 @@ handle_compression(const char *remote,
         close(get_data->fd);
         get_data->fd = open(local, O_RDONLY);
         if (-1 == get_data->fd) {
-                LOG("open: %s", strerror(errno));
+                LOG(LOG_ERR, "open: %s", strerror(errno));
                 ret = -1;
                 goto end;
         }
@@ -305,7 +309,8 @@ dfs_get_local_copy(pentry_t *pe,
         char *local = NULL;
 
         local = tmpstr_printf("%s/%s", cache_dir, remote);
-        LOG("bucket=%s, path=%s, local=%s", ctx->cur_bucket, remote, local);
+        LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
+            ctx->cur_bucket, remote, local);
 
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
@@ -316,14 +321,15 @@ dfs_get_local_copy(pentry_t *pe,
         /* a cache file already exist, its MD5 digest is different, so...
          * just remove it */
         if (0 == access(local, F_OK)) {
-                LOG("removing cache file '%s'", local);
+                LOG(LOG_DEBUG, "removing cache file '%s'", local);
                 if (-1 == unlink(local))
-                        LOG("unlink(%s): %s", local, strerror(errno));
+                        LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
         }
 
         get_data.fd = open(local, O_RDWR|O_CREAT, 0600);
         if (-1 == get_data.fd) {
-                LOG("open: %s: %s (%d)", local, strerror(errno), errno);
+                LOG(LOG_ERR, "open: %s: %s (%d)",
+                    local, strerror(errno), errno);
                 return -1;
         }
 
@@ -336,7 +342,7 @@ dfs_get_local_copy(pentry_t *pe,
                           &metadata);
 
         if (DPL_SUCCESS != rc) {
-                LOG("dpl_openread: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_openread: %s", dpl_status_str(rc));
                 close(get_data.fd);
                 return -1;
         }

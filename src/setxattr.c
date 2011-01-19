@@ -11,7 +11,7 @@ dfs_setxattr(const char *path,
              size_t size,
              int flag)
 {
-        LOG("path=%s, name=%s, value=%s, size=%zu, flag=%d",
+        LOG(LOG_DEBUG, "path=%s, name=%s, value=%s, size=%zu, flag=%d",
             path, name, value, size, flag);
 
         return 0;

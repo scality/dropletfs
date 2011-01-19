@@ -37,7 +37,8 @@ gc_callback(gpointer key,
                 return;
 
         if (pentry_trylock(pe)) {
-                LOG("pentry_trylock(%s): %s (in use)", path, strerror(errno));
+                LOG(LOG_DEBUG, "pentry_trylock(%s): %s (in use)",
+                    path, strerror(errno));
                 return;
         }
 
@@ -50,13 +51,13 @@ gc_callback(gpointer key,
 
         if (fd < 0)  {
                 /* negative but not -1? it's an error*/
-                LOG("bad file descriptor (%d), remove the cell!", fd);
+                LOG(LOG_ERR, "bad file descriptor (%d), remove the cell!", fd);
                 goto remove;
         }
 
         if (-1 == fstat(fd, &st)) {
-                LOG("fstat(fd=%d, %p): %s", fd, (void *)&st, strerror(errno));
-                LOG("remove the cell");
+                LOG(LOG_ERR, "fstat(fd=%d, %p): %s, remove the cell",
+                    fd, (void *)&st, strerror(errno));
                 goto remove;
         }
 
@@ -66,23 +67,23 @@ gc_callback(gpointer key,
             t < st.st_ctime + gc_age_threshold)
                 goto release;
 
-        LOG("cache file too old: now=%d, atime=%d, mtime=%d, ctime=%d",
-            (int)t, (int)st.st_atime, (int)st.st_mtime, (int)st.st_ctime);
+        LOG(LOG_DEBUG, "%s file too old: now=%d, atime=%d, mtime=%d, ctime=%d",
+            path, (int)t, (int)st.st_atime, (int)st.st_mtime, (int)st.st_ctime);
 
   remove:
         local = tmpstr_printf("%s/%s", cache_dir, path);
-        LOG("removing cache file '%s'", local);
+        LOG(LOG_INFO, "removing cache file '%s'", local);
         if (-1 == unlink(local))
-                LOG("unlink(%s): %s", local, strerror(errno));
+                LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
 
         if (FALSE == g_hash_table_remove(hash, path))
-                LOG("can't remove the cell from the hashtable");
+                LOG(LOG_WARNING, "can't remove the cell from the hashtable");
 
         return;
 
   release:
         if (pentry_unlock(pe))
-                LOG("pentry_unlock(%s): %s", path, strerror(errno));
+                LOG(LOG_DEBUG, "pentry_unlock(%s): %s", path, strerror(errno));
 }
 
 void *
@@ -90,7 +91,7 @@ thread_gc(void *cb_arg)
 {
         GHashTable *hash = cb_arg;
 
-        LOG("entering thread");
+        LOG(LOG_DEBUG, "entering thread");
 
         while (1) {
                 sleep(gc_loop_delay);

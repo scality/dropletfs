@@ -4,7 +4,7 @@
 int
 dfs_statfs(const char *path, struct statvfs *buf)
 {
-        LOG("path=%s, buf=%p", path, (void *)buf);
+        LOG(LOG_DEBUG, "path=%s, buf=%p", path, (void *)buf);
 
         buf->f_flag = ST_RDONLY;
         buf->f_namemax = 255;

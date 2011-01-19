@@ -12,7 +12,7 @@ dfs_chmod(const char *path,
         dpl_dict_t *metadata = NULL;
         dpl_status_t rc = DPL_FAILURE;
 
-        LOG("%s", path);
+        LOG(LOG_DEBUG, "%s", path);
 
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
@@ -33,6 +33,6 @@ dfs_chmod(const char *path,
         return 0;
 
 failure:
-        LOG("dpl_setattr: %s (%d)", dpl_status_str(rc), rc);
+        LOG(LOG_ERR, "dpl_setattr: %s (%d)", dpl_status_str(rc), rc);
         return -1;
 }

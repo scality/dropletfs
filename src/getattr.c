@@ -14,7 +14,8 @@ extern int max_retry;
 extern GHashTable *hash;
 
 static void
-set_default_stat(struct stat *st, dpl_ftype_t type)
+set_default_stat(struct stat *st,
+                 dpl_ftype_t type)
 {
         /* default modes, if no corresponding metadata is found */
         switch (type) {
@@ -46,12 +47,12 @@ dfs_getattr_cached(pentry_t *pe,
         int fd;
 
         fd = pentry_get_fd(pe);
-        LOG("pe@%p, fd=%d", (void *)pe, fd);
+        LOG(LOG_DEBUG, "pe@%p, fd=%d", (void *)pe, fd);
 
         /* if the flag is CLEAN, then the file was successfully uploaded,
          * just grab its metadata */
         if (FLAG_CLEAN == pentry_get_flag(pe)) {
-                LOG("file upload is finished");
+                LOG(LOG_INFO, "file upload is finished");
                 ret = -1;
                 goto end;
         }
@@ -59,12 +60,13 @@ dfs_getattr_cached(pentry_t *pe,
         /* otherwise, use the `struct stat' info of local cache file
          * descriptor */
         if (-1 == fstat(fd, st)) {
-                LOG("fstat: %s", strerror(errno));
+                LOG(LOG_ERR, "fstat: %s", strerror(errno));
                 ret = -1;
                 goto end;
         }
 
-        LOG("use the cache file descriptor (%d) to fill struct stat", fd);
+        LOG(LOG_INFO, "use the cache file descriptor (%d) to fill struct stat",
+            fd);
         ret = 0;
   end:
         return ret;
@@ -83,7 +85,7 @@ dfs_getattr(const char *path,
         int tries = 0;
         int delay = 1;
 
-        LOG("path=%s, st=%p", path, (void *)st);
+        LOG(LOG_DEBUG, "path=%s, st=%p", path, (void *)st);
 
         memset(st, 0, sizeof *st);
 
@@ -96,7 +98,7 @@ dfs_getattr(const char *path,
                 }
         }
 
-        LOG("we have to retrieve remote metadata to check synchronization");
+        LOG(LOG_DEBUG, "retrieve remote metadata to check synchronization");
 
         /*
          * why setting st_nlink to 1?
@@ -117,7 +119,7 @@ dfs_getattr(const char *path,
         rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                        ino, &parent_ino, &obj_ino, &type);
 
-        LOG("dpl_namei returned %s, type=%s, parent_ino=%s, obj_ino=%s",
+        LOG(LOG_DEBUG, "dpl_namei: %s, type=%s, parent_ino=%s, obj_ino=%s",
             dpl_status_str(rc), dfs_ftypetostr(type),
             parent_ino.key, obj_ino.key);
 
@@ -126,9 +128,11 @@ dfs_getattr(const char *path,
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG("namei timeout? (%s)", dpl_status_str(rc));
+                        LOG(LOG_NOTICE, "namei timeout? (%s)",
+                            dpl_status_str(rc));
                         goto namei_retry;
                 }
+                LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
                 ret = rc;
                 goto end;
         }
@@ -143,10 +147,11 @@ dfs_getattr(const char *path,
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG("getattr timeout? (%s)", dpl_status_str(rc));
+                        LOG(LOG_NOTICE, "getattr timeout? (%s)",
+                            dpl_status_str(rc));
                         goto getattr_retry;
                 }
-                LOG("dpl_getattr: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_getattr: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);
                 ret = -1;

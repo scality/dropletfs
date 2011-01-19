@@ -166,5 +166,5 @@ zerr_to_str(int ret)
                 return "zlib version mismatch";
         }
 
-        assert(!"unknown zlib return code");
+        assert(! "unknown zlib return code");
 }

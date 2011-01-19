@@ -17,17 +17,17 @@ dfs_fsync(const char *path,
         struct pentry *pe = NULL;
         int fd = -1;
 
-        LOG("%s", path);
+        LOG(LOG_DEBUG, "%s", path);
 
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
-                LOG("unable to find a path entry");
+                LOG(LOG_INFO, "unable to find a path entry (%s)", path);
                 goto end;
         }
 
         fd = pentry_get_fd(pe);
         if (fd < 0) {
-                LOG("unusable file descriptor: %d", fd);
+                LOG(LOG_ERR, "unusable file descriptor: %d", fd);
                 goto end;
         }
 
@@ -35,7 +35,7 @@ dfs_fsync(const char *path,
                 goto end;
 
         if (-1 == fsync(fd)) {
-                LOG("fsync: %s", strerror(errno));
+                LOG(LOG_ERR, "fsync: %s", strerror(errno));
                 return -errno;
         }
 

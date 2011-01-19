@@ -10,7 +10,7 @@ cb_var_print(dpl_var_t *var,
              void *arg)
 {
         (void)arg;
-        LOG("var=%s, value=%s", var->key, var->value);
+        LOG(LOG_DEBUG, "var=%s, value=%s", var->key, var->value);
 }
 
 void
@@ -41,7 +41,7 @@ assign_meta_to_dict(dpl_dict_t *dict,
         }
 
         buf = tmpstr_printf("%lu", val);
-        LOG("meta='%s', value='%s'", meta, buf);
+        LOG(LOG_DEBUG, "meta='%s', value='%s'", meta, buf);
         dpl_dict_add(dict, meta, buf, 0);
 }
 
@@ -83,15 +83,15 @@ metadatatoll(dpl_dict_t *dict,
         value = dpl_dict_get_value(dict, (char *)name);
 
         if (! value) {
-                LOG("can't grab any meta '%s'", name);
+                LOG(LOG_NOTICE, "can't grab any meta '%s'", name);
                 return -1;
         }
 
         v = strtoull(value, NULL, 10);
         if (0 == strcmp(name, "mode"))
-                LOG("meta=%s, value=0x%x", name, (unsigned)v);
+                LOG(LOG_DEBUG, "meta=%s, value=0x%x", name, (unsigned)v);
         else
-                LOG("meta=%s, value=%s", name, value);
+                LOG(LOG_DEBUG, "meta=%s, value=%s", name, value);
 
         return v;
 }
@@ -106,7 +106,6 @@ void
 fill_stat_from_metadata(struct stat *st,
                         dpl_dict_t *dict)
 {
-        LOG("entering function");
         STORE_META(st, dict, size, size_t);
         STORE_META(st, dict, mode, mode_t);
         STORE_META(st, dict, uid, uid_t);

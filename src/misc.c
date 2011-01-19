@@ -12,7 +12,8 @@
 
 #define MKDIR(path, mode) do {                                          \
                 if (-1 == mkdir(path, mode) && EEXIST != errno)         \
-                        LOG("mkdir(%s): %s", path, strerror(errno));    \
+                        LOG(LOG_ERR, "mkdir(%s): %s",                   \
+                            path, strerror(errno));                     \
         } while (0)
 
 void
@@ -20,7 +21,7 @@ mkdir_tree(const char *dir) {
         char *tmp = NULL;
         char *p = NULL;
 
-        LOG("dir='%s'", dir);
+        LOG(LOG_DEBUG, "dir='%s'", dir);
 
         if (! dir)
                 return;
