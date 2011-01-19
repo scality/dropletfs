@@ -9,12 +9,41 @@
 
 extern GHashTable *hash;
 
+static int
+populate_hash(GHashTable *h,
+              pentry_t *pe,
+              const char * const path)
+{
+        int ret;
+        char *key = NULL;
+
+        pe = pentry_new();
+        if (! pe) {
+                ret = -1;
+                goto err;
+        }
+
+        pentry_set_fd(pe, -1);
+        key = strdup(path);
+        if (! key) {
+                LOG(LOG_CRIT, "strdup(%s): %s", path, strerror(errno));
+                pentry_free(pe);
+                ret = -1;
+                goto err;
+        }
+
+        g_hash_table_insert(hash, key, pe);
+
+        ret = 0;
+  err:
+        return ret;
+}
+
 int
 dfs_open(const char *path,
          struct fuse_file_info *info)
 {
         pentry_t *pe = NULL;
-        char *key = NULL;
         char *file = NULL;
         int fd = -1;
         int ret = -1;
@@ -25,23 +54,14 @@ dfs_open(const char *path,
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
                 LOG(LOG_INFO, "'%s': entry not found in hashtable", path);
-                pe = pentry_new();
-                if (! pe) {
+                if (-1 == populate_hash(hash, pe, path)) {
                         ret = -1;
                         goto err;
                 }
-                pentry_set_fd(pe, -1);
-                key = strdup(path);
-                if (! key) {
-                        LOG(LOG_CRIT, "strdup(%s): %s", path, strerror(errno));
-                        pentry_free(pe);
-                        goto err;
-                }
                 LOG(LOG_INFO, "adding file '%s' to the hashtable", path);
-                g_hash_table_insert(hash, key, pe);
         } else {
                 fd = pentry_get_fd(pe);
-                LOG(LOG_INFO, "'%s': found in the hashtable, fd=%d", path, fd);
+                LOG(LOG_INFO, "%s: found in the hashtable, fd=%d", path, fd);
         }
 
         pentry_inc_refcount(pe);
