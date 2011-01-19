@@ -11,11 +11,17 @@ extern GHashTable *hash;
 
 static int
 populate_hash(GHashTable *h,
-              pentry_t *pe,
-              const char * const path)
+              const char * const path,
+              pentry_t **pep)
 {
         int ret;
         char *key = NULL;
+        pentry_t *pe = NULL;
+
+        if (! pep) {
+                ret = -1;
+                goto err;
+        }
 
         pe = pentry_new();
         if (! pe) {
@@ -32,7 +38,8 @@ populate_hash(GHashTable *h,
                 goto err;
         }
 
-        g_hash_table_insert(hash, key, pe);
+        *pep = pe;
+        g_hash_table_insert(h, key, pe);
 
         ret = 0;
   err:
@@ -40,16 +47,25 @@ populate_hash(GHashTable *h,
 }
 
 static int
-open_read_only(const char * const path,
-               pentry_t *pe)
+open_read_write(const char * const path,
+                pentry_t *pe)
 {
         int ret;
         int fd;
+        char *local = NULL;
 
-        LOG(LOG_INFO, "opening cache file '%s'", path);
-        fd = open(path, O_RDWR|O_CREAT|O_TRUNC, 0644);
+        local = build_cache_tree(path);
+
+        if (! local) {
+                LOG(LOG_ERR, "can't create a cache local path (%s)", path);
+                ret = -1;
+                goto err;
+        }
+
+        LOG(LOG_INFO, "opening cache file '%s'", local);
+        fd = open(local, O_RDWR|O_CREAT|O_TRUNC, 0644);
         if (-1 == fd) {
-                LOG(LOG_ERR, "%s: %s", path, strerror(errno));
+                LOG(LOG_ERR, "%s: %s", local, strerror(errno));
                 ret = -1;
                 goto err;
         }
@@ -62,7 +78,7 @@ open_read_only(const char * const path,
 }
 
 static int
-open_read_write(const char * const path,
+open_read_only(const char * const path,
                 pentry_t *pe)
 {
         int ret;
@@ -91,7 +107,6 @@ dfs_open(const char *path,
          struct fuse_file_info *info)
 {
         pentry_t *pe = NULL;
-        char *file = NULL;
         int fd = -1;
         int ret = -1;
 
@@ -101,7 +116,7 @@ dfs_open(const char *path,
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
                 LOG(LOG_INFO, "'%s': entry not found in hashtable", path);
-                if (-1 == populate_hash(hash, pe, path)) {
+                if (-1 == populate_hash(hash, path, &pe)) {
                         ret = -1;
                         goto err;
                 }
@@ -121,21 +136,14 @@ dfs_open(const char *path,
         }
 
         info->fh = (uint64_t)pe;
-        file = build_cache_tree(path);
-
-        if (! file) {
-                LOG(LOG_ERR, "can't create a cache file path (%s)", path);
-                ret = -1;
-                goto err;
-        }
 
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
-                if (-1 == open_read_write(file, pe)) {
+                if (-1 == open_read_write(path, pe)) {
                         ret = -1;
                         goto err;
                 }
         } else {
-                if (-1 == open_read_only(file, pe)) {
+                if (-1 == open_read_only(path, pe)) {
                         ret = -1;
                         goto err;
                 }
