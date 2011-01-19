@@ -88,7 +88,6 @@ read_write_all_vfile(int fd,
         return 0;
 }
 
-
 int
 cb_get_buffered(void *arg,
                 char *buf,
@@ -107,13 +106,13 @@ cb_get_buffered(void *arg,
         return 0;
 }
 
-
 static int
 dfs_md5cmp(pentry_t *pe,
            char *path)
 {
         dpl_dict_t *dict = NULL;
         char *remote_md5 = NULL;
+        int ret;
         int diff = 1;
         dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
@@ -124,6 +123,7 @@ dfs_md5cmp(pentry_t *pe,
         digest = pentry_get_digest(pe);
         if (! digest) {
                 LOG(LOG_DEBUG, "no digest");
+                ret = 1;
                 goto err;
         }
 
@@ -139,12 +139,14 @@ dfs_md5cmp(pentry_t *pe,
                         goto namei_retry;
                 }
                 LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                ret = 1;
                 goto err;
         }
 
         rc = dpl_head_all(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
         if (DPL_SUCCESS != rc) {
                 LOG(LOG_ERR, "dpl_head_all: %s", dpl_status_str(rc));
+                ret = 1;
                 goto err;
         }
 
@@ -160,15 +162,16 @@ dfs_md5cmp(pentry_t *pe,
                 if (diff) {
                         pentry_set_digest(pe, remote_md5);
                         LOG(LOG_DEBUG, "updated local md5=%.*s",
-                            MD5_DIGEST_LENGTH, pentry_get_digest(pe));
+                      MD5_DIGEST_LENGTH, pentry_get_digest(pe));
                 }
         }
 
+        ret = diff;
   err:
         if (dict)
                 dpl_dict_free(dict);
 
-        return diff;
+        return ret;
 
 }
 
@@ -310,8 +313,9 @@ handle_compression(const char *remote,
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(pentry_t *pe,
-                   const char *remote)
+                   const char * const remote)
 {
+        int fd;
         dpl_dict_t *metadata = NULL;
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
@@ -324,10 +328,12 @@ dfs_get_local_copy(pentry_t *pe,
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(pe, (char *)remote))
-                return pentry_get_fd(pe);
+        if (0 == dfs_md5cmp(pe, (char *)remote))  {
+                fd = pentry_get_fd(pe);
+                goto end;
+        }
 
-        /* a cache file already exist, its MD5 digest is different, so...
+        /* a cache file already exist, its MD5 digest is different, so
          * just remove it */
         if (0 == access(local, F_OK)) {
                 LOG(LOG_DEBUG, "removing cache file '%s'", local);
@@ -339,7 +345,8 @@ dfs_get_local_copy(pentry_t *pe,
         if (-1 == get_data.fd) {
                 LOG(LOG_ERR, "open: %s: %s (%d)",
                     local, strerror(errno), errno);
-                return -1;
+                fd = -1;
+                goto end;
         }
 
         rc = dpl_openread(ctx,
@@ -353,12 +360,17 @@ dfs_get_local_copy(pentry_t *pe,
         if (DPL_SUCCESS != rc) {
                 LOG(LOG_ERR, "dpl_openread: %s", dpl_status_str(rc));
                 close(get_data.fd);
-                return -1;
+                fd = -1;
+                goto end;
         }
 
         /* If the file is compressed, uncompress it! */
-        if(-1 == handle_compression(remote, local, &get_data, metadata))
+        if(-1 == handle_compression(remote, local, &get_data, metadata)) {
+                fd = -1;
                 goto end;
+        }
+
+        fd = get_data.fd;
 
   end:
         if (metadata) {
@@ -366,5 +378,5 @@ dfs_get_local_copy(pentry_t *pe,
                 dpl_dict_free(metadata);
         }
 
-        return get_data.fd;
+        return fd;
 }
