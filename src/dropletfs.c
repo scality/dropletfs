@@ -7,6 +7,7 @@
 #include <sys/statvfs.h>
 #include <libgen.h>
 #include <glib.h>
+#include <pthread.h>
 
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
@@ -38,11 +39,14 @@
 #include "chmod.h"
 #include "chown.h"
 
+#include "gc.h"
 
 #define DEFAULT_COMPRESSION_METHOD "NONE"
 #define DEFAULT_ZLIB_LEVEL 3
 #define DEFAULT_CACHE_DIR "/tmp"
 #define DEFAULT_MAX_RETRY 5
+#define DEFAULT_GC_LOOP_DELAY 60
+#define DEFAULT_GC_AGE_THRESHOLD 600
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
@@ -54,6 +58,8 @@ unsigned long zlib_level = 0;
 char *compression_method = NULL;
 char *cache_dir = NULL;
 int max_retry = 0;
+int gc_loop_delay = 0;
+int gc_age_threshold = 0;
 
 static void
 atexit_callback(void)
@@ -169,8 +175,15 @@ static void *
 dfs_init(struct fuse_conn_info *conn)
 {
         (void)conn;
+        pthread_t gc_id;
+        pthread_attr_t gc_attr;
 
         LOG("Entering function");
+
+        pthread_attr_init(&gc_attr);
+        pthread_attr_setdetachstate(&gc_attr, PTHREAD_CREATE_JOINABLE);
+        pthread_create(&gc_id, &gc_attr, thread_gc, hash);
+
         return NULL;
 }
 
@@ -381,6 +394,13 @@ set_cache_dir(void)
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
+        /* remove the trailing spaces */
+        p = tmp + strlen(tmp) - 1;
+        while (p && *p && '/' == *p) {
+                *p = 0;
+                p--;
+        }
+
         cache_dir = tmpstr_printf("%s/%s", tmp, ctx->cur_bucket);
         if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
                 LOG("mkdir(%s) = %s", cache_dir, strerror(errno));
@@ -389,13 +409,41 @@ set_cache_dir(void)
 
         /* remove the trailing spaces */
         p = cache_dir + strlen(cache_dir) - 1;
-        while (p && '/' == *p) {
+        while (p && *p && '/' == *p) {
                 *p = 0;
                 p--;
         }
         LOG("cache directory created: '%s'", cache_dir);
 
         return 0;
+}
+
+static void
+set_gc_loop_delay_env(void)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_GC_LOOP_DELAY");
+        LOG("DROPLETFS_GC_LOOP_DELAY=%s", tmp ? tmp : "unset");
+
+        if (tmp)
+                gc_loop_delay = strtoul(tmp, NULL, 10);
+        else
+                gc_loop_delay = DEFAULT_GC_LOOP_DELAY;
+}
+
+static void
+set_gc_age_threshold_env(void)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_GC_AGE_THRESHOLD");
+        LOG("DROPLETFS_GC_AGE_THRESHOLD=%s", tmp ? tmp : "unset");
+
+        if (tmp)
+                gc_age_threshold = strtoul(tmp, NULL, 10);
+        else
+                gc_age_threshold = DEFAULT_GC_AGE_THRESHOLD;
 }
 
 static void
@@ -442,6 +490,8 @@ set_dplfs_env(void)
 {
         set_compression_env();
         set_max_retry_env();
+        set_gc_loop_delay_env();
+        set_gc_age_threshold_env();
 
         if (-1 == set_cache_dir()) {
                 LOG("can't create any cache directory");
@@ -498,6 +548,8 @@ main(int argc, char **argv)
         LOG("zlib compression method set to: %s", compression_method);
 	LOG("local cache directory set to: %s", cache_dir);
 	LOG("max number of network i/o attempts set to: %d", max_retry);
+        LOG("garbage collector loop delay set to: %d", gc_loop_delay);
+        LOG("garbage collector age threshold set to: %d", gc_age_threshold);
 
         rc = dfs_fuse_main(&args);
 

@@ -92,11 +92,12 @@ dfs_release(const char *path,
         dpl_status_t rc = DPL_FAILURE;
         dpl_dict_t *dict = NULL;
         struct stat st;
-        int ret = 0;
+        int ret = -1;
         size_t size = 0;
         size_t zsize = 0;
         int fd = -1;
         int zfd = -1;
+        int fd_tosend;
         char *local = NULL;
         char *zlocal = NULL;
         FILE *fpsrc = NULL;
@@ -126,16 +127,20 @@ dfs_release(const char *path,
                 goto err;
         }
 
+        pentry_dec_refcount(pe);
+
         /* We opened a file but we do not want to update it on the server since
          * it was only for read-only purposes */
         if (O_RDONLY == (info->flags & O_ACCMODE)) {
                 LOG("fd=%d was opened with O_RDONLY mode", fd);
+                ret = 0;
                 goto end;
         }
 
         size = st.st_size;
         dict = dpl_dict_new(13);
         fill_metadata_from_stat(dict, &st);
+        fd_tosend = fd;
 
         local = tmpstr_printf("%s/%s", cache_dir, path);
 
@@ -168,7 +173,7 @@ dfs_release(const char *path,
                 /* file correctly compressed, send it */
                 if (zfd > 0) {
                         size = zsize;
-                        fd = zfd;
+                        fd_tosend = zfd;
                 }
         }
 
@@ -197,12 +202,12 @@ dfs_release(const char *path,
                 goto err;
         }
 
-        LOG("calling read_write_all_vfile(fd=%d, vfile=%p)", fd, (void *)vfile);
-        if (-1 == read_write_all_vfile(fd, vfile)) {
+        if (-1 == read_write_all_vfile(fd_tosend, vfile)) {
                 ret = -1;
                 goto err;
         }
 
+        ret = 0;
   err:
         if (dict)
                 dpl_dict_free(dict);
@@ -217,19 +222,23 @@ dfs_release(const char *path,
 
         if (pe) {
                 pentry_set_flag(pe, FLAG_CLEAN);
-                LOG("pentry_unlock(fd=%d)..", pentry_get_fd(pe));
                 (void)pentry_unlock(pe);
-                LOG("pentry_unlock(fd=%d) finished!", pentry_get_fd(pe));
         }
 
         if (fpsrc)
                 fclose(fpsrc);
 
+        if (-1 == lseek(fd, 0, SEEK_SET))
+                LOG("lseek(fd=%d, 0, SEEK_SET): %s", fd, strerror(errno));
+
         if (fpdst)
                 fclose(fpdst);
 
-        if (zlocal && -1 == unlink(zlocal))
-                LOG("unlink: %s", strerror(errno));
+        if (zlocal) {
+                LOG("removing cache file '%s'", zlocal);
+                if (-1 == unlink(zlocal))
+                        LOG("unlink: %s", strerror(errno));
+        }
 
   end:
         LOG("return value=%d", ret);

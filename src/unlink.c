@@ -19,6 +19,7 @@ dfs_unlink(const char *path)
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
         pentry_t *pe = NULL;
+        int ret;
 
         LOG("path=%s", path);
 
@@ -26,7 +27,8 @@ dfs_unlink(const char *path)
 
         if (DPL_SUCCESS != rc) {
                 LOG("dpl_unlink: %s", dpl_status_str(rc));
-                return rc;
+                ret = 1;
+                goto end;
         }
 
         local = tmpstr_printf("%s/%s", cache_dir, path);
@@ -34,10 +36,21 @@ dfs_unlink(const char *path)
                 LOG("unlink cache file (%s): %s", local, strerror(errno));
 
         pe = g_hash_table_lookup(hash, path);
-        if (! pe)
+        if (! pe) {
                 LOG("path entry not found");
-        else
-                g_hash_table_remove(hash, path);
+                ret = 0;
+                goto end;
+        }
 
-        return 0;
+        if (FALSE == g_hash_table_remove(hash, path))
+                /* Ok, we can't lighten the hastable from this entry,
+                 * but we successfully removed the local file, so, from
+                 * a filesystem point of view, we do not want to return
+                 * an error
+                 */
+                LOG("%s: can't remove the cell from the hashtable", path);
+
+        ret = 0;
+ end:
+        return ret;
 }

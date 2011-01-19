@@ -37,21 +37,20 @@ dfs_open(const char *path,
                         pentry_free(pe);
                         goto err;
                 }
+                LOG("adding file '%s' to the hashtable", path);
                 g_hash_table_insert(hash, key, pe);
         } else {
                 fd = pentry_get_fd(pe);
                 LOG("'%s': found in the hashtable, fd=%d", path, fd);
         }
 
+        pentry_inc_refcount(pe);
+
         if (O_RDONLY != (info->flags & O_ACCMODE)) {
-                /* unlock the file on release() */
-                LOG("pentry_lock(fd=%d)..", fd);
                 if (pentry_lock(pe)) {
-                        LOG("pentry_lock(%d) failed: %s", fd, strerror(errno));
                         ret = -1;
                         goto err;
                 }
-                LOG("pentry_lock(fd=%d) finished!", fd);
         }
 
         info->fh = (uint64_t)pe;

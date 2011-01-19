@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <glib.h>
 #include <droplet.h>
+#include <time.h>
 
 #include "getattr.h"
 #include "glob.h"

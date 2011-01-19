@@ -315,8 +315,11 @@ dfs_get_local_copy(pentry_t *pe,
 
         /* a cache file already exist, its MD5 digest is different, so...
          * just remove it */
-        if (0 == access(local, F_OK))
-                unlink(local);
+        if (0 == access(local, F_OK)) {
+                LOG("removing cache file '%s'", local);
+                if (-1 == unlink(local))
+                        LOG("unlink(%s): %s", local, strerror(errno));
+        }
 
         get_data.fd = open(local, O_RDWR|O_CREAT, 0600);
         if (-1 == get_data.fd) {

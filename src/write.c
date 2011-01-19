@@ -22,15 +22,18 @@ dfs_write(const char *path,
         fd = pentry_get_fd(pe);
         if (fd < 0) {
                 LOG("unusable file descriptor fd=%d", fd);
-                return EBADF;
+                ret = EBADF;
+                goto err;
         }
 
         ret = pwrite(fd, buf, size, offset);
         if (-1 == ret) {
                 LOG("pwrite: %s", strerror(errno));
                 ret = -errno;
+                goto err;
         }
 
+  err:
         LOG("return value = %d", ret);
         return ret;
 }
