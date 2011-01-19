@@ -11,11 +11,17 @@ extern GHashTable *hash;
 
 static int
 populate_hash(GHashTable *h,
-              pentry_t *pe,
-              const char * const path)
+              const char * const path,
+              pentry_t **pep)
 {
         int ret;
         char *key = NULL;
+        pentry_t *pe = NULL;
+
+        if (! pep) {
+                ret = -1;
+                goto err;
+        }
 
         pe = pentry_new();
         if (! pe) {
@@ -32,7 +38,8 @@ populate_hash(GHashTable *h,
                 goto err;
         }
 
-        g_hash_table_insert(hash, key, pe);
+        *pep = pe;
+        g_hash_table_insert(h, key, pe);
 
         ret = 0;
   err:
@@ -40,8 +47,8 @@ populate_hash(GHashTable *h,
 }
 
 static int
-open_read_only(const char * const path,
-               pentry_t *pe)
+open_read_write(const char * const path,
+                pentry_t *pe)
 {
         int ret;
         int fd;
@@ -62,7 +69,7 @@ open_read_only(const char * const path,
 }
 
 static int
-open_read_write(const char * const path,
+open_read_only(const char * const path,
                 pentry_t *pe)
 {
         int ret;
@@ -101,7 +108,7 @@ dfs_open(const char *path,
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
                 LOG(LOG_INFO, "'%s': entry not found in hashtable", path);
-                if (-1 == populate_hash(hash, pe, path)) {
+                if (-1 == populate_hash(hash, path, &pe)) {
                         ret = -1;
                         goto err;
                 }
