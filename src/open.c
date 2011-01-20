@@ -52,11 +52,20 @@ open_read_write(const char * const path,
 {
         int ret;
         int fd;
+        char *local = NULL;
 
-        LOG(LOG_INFO, "opening cache file '%s'", path);
-        fd = open(path, O_RDWR|O_CREAT|O_TRUNC, 0644);
+        local = build_cache_tree(path);
+
+        if (! local) {
+                LOG(LOG_ERR, "can't create a cache local path (%s)", path);
+                ret = -1;
+                goto err;
+        }
+
+        LOG(LOG_INFO, "opening cache file '%s'", local);
+        fd = open(local, O_RDWR|O_CREAT|O_TRUNC, 0644);
         if (-1 == fd) {
-                LOG(LOG_ERR, "%s: %s", path, strerror(errno));
+                LOG(LOG_ERR, "%s: %s", local, strerror(errno));
                 ret = -1;
                 goto err;
         }
@@ -98,7 +107,6 @@ dfs_open(const char *path,
          struct fuse_file_info *info)
 {
         pentry_t *pe = NULL;
-        char *file = NULL;
         int fd = -1;
         int ret = -1;
 
@@ -128,21 +136,14 @@ dfs_open(const char *path,
         }
 
         info->fh = (uint64_t)pe;
-        file = build_cache_tree(path);
-
-        if (! file) {
-                LOG(LOG_ERR, "can't create a cache file path (%s)", path);
-                ret = -1;
-                goto err;
-        }
 
         if (O_WRONLY == (info->flags & O_ACCMODE)) {
-                if (-1 == open_read_write(file, pe)) {
+                if (-1 == open_read_write(path, pe)) {
                         ret = -1;
                         goto err;
                 }
         } else {
-                if (-1 == open_read_only(file, pe)) {
+                if (-1 == open_read_only(path, pe)) {
                         ret = -1;
                         goto err;
                 }
