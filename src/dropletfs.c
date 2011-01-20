@@ -62,15 +62,6 @@ int max_retry = 0;
 int gc_loop_delay = 0;
 int gc_age_threshold = 0;
 
-static void
-atexit_callback(void)
-{
-        if (hash)
-                g_hash_table_remove_all(hash);
-	dpl_free();
-}
-
-
 
 /* Not implemented yet */
 
@@ -192,6 +183,13 @@ static void
 dfs_destroy(void *arg)
 {
         LOG(LOG_DEBUG, "%p", arg);
+
+        if (hash) {
+                LOG(LOG_DEBUG, "releasing hashtable memory");
+                g_hash_table_remove_all(hash);
+        }
+        LOG(LOG_DEBUG, "freeing libdroplet context");
+	dpl_free();
 }
 
 static int
@@ -569,8 +567,6 @@ main(int argc, char **argv)
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
         int debug = 0;
-
-        atexit(atexit_callback);
 
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
 
