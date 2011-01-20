@@ -3,7 +3,6 @@
 #include <errno.h>
 
 #include "glob.h"
-#include "misc.h"
 #include "log.h"
 #include "file.h"
 #include "tmpstr.h"
@@ -174,44 +173,6 @@ dfs_md5cmp(pentry_t *pe,
         return ret;
 
 }
-
-
-char *
-build_cache_tree(const char *path)
-{
-        LOG(LOG_DEBUG, "building cache dir for '%s'", path);
-
-        char *local = NULL;
-        char *tmp_local = NULL;
-        char *dir = NULL;
-        struct stat st;
-
-        /* ignore the leading spaces */
-        while (path && '/' == *path)
-                path++;
-
-        local = tmpstr_printf("%s/%s", cache_dir, path);
-
-        tmp_local = strdup(local);
-
-        if (! tmp_local) {
-                LOG(LOG_CRIT, "strdup(%s): %s", tmp_local, strerror(errno));
-                return NULL;
-        }
-
-        dir = tmpstr_printf("%s", dirname(tmp_local));
-        if (-1 == stat(dir, &st)) {
-                if (ENOENT == errno)
-                        mkdir_tree(dir);
-                else
-                        LOG(LOG_ERR, "stat(%s): %s", dir, strerror(errno));
-        }
-
-        free(tmp_local);
-
-        return local;
-}
-
 
 static int
 handle_compression(const char *remote,
