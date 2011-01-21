@@ -1,8 +1,9 @@
 #include <droplet.h>
 
-#include "glob.h"
 #include "log.h"
 #include "rmdir.h"
+
+extern dpl_ctx_t *ctx;
 
 int
 dfs_rmdir(const char *path)

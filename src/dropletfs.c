@@ -39,28 +39,14 @@
 #include "chmod.h"
 #include "chown.h"
 
+#include "env.h"
 #include "gc.h"
-
-#define DEFAULT_COMPRESSION_METHOD "NONE"
-#define DEFAULT_ZLIB_LEVEL 3
-#define DEFAULT_CACHE_DIR "/tmp"
-#define DEFAULT_MAX_RETRY 5
-#define DEFAULT_GC_LOOP_DELAY 60
-#define DEFAULT_GC_AGE_THRESHOLD 600
-#define DEFAULT_LOG_LEVEL LOG_ERR
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
 mode_t root_mode = 0;
 GHashTable *hash = NULL;
-
-unsigned long zlib_level = 0;
-char *compression_method = NULL;
-char *cache_dir = NULL;
-int log_level = -1;
-int max_retry = 0;
-int gc_loop_delay = 0;
-int gc_age_threshold = 0;
+struct env *env = NULL;
 
 
 /* Not implemented yet */
@@ -382,187 +368,10 @@ usage(const char * const prog)
         printf("\t[options]\tfuse/mount options\n");
 }
 
-static int
-set_cache_dir(void)
-{
-        char *tmp = NULL;
-        char *p = NULL;
-
-        tmp = getenv("DROPLETFS_CACHE_DIR");
-        LOG(LOG_DEBUG, "DROPLETFS_CACHE_DIR=%s", tmp ? tmp : "unset");
-        if (! tmp)
-                tmp = DEFAULT_CACHE_DIR;
-
-        /* remove the trailing spaces */
-        p = tmp + strlen(tmp) - 1;
-        while (p && *p && '/' == *p) {
-                *p = 0;
-                p--;
-        }
-
-        cache_dir = tmpstr_printf("%s/%s", tmp, ctx->cur_bucket);
-        if (-1 == mkdir(cache_dir, 0777) && EEXIST != errno) {
-                LOG(LOG_DEBUG, "mkdir(%s) = %s", cache_dir, strerror(errno));
-                return -1;
-        }
-
-        /* remove the trailing spaces */
-        p = cache_dir + strlen(cache_dir) - 1;
-        while (p && *p && '/' == *p) {
-                *p = 0;
-                p--;
-        }
-        LOG(LOG_DEBUG, "cache directory created: '%s'", cache_dir);
-
-        return 0;
-}
-
-static void
-set_gc_loop_delay_env(void)
-{
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_GC_LOOP_DELAY");
-        LOG(LOG_DEBUG, "DROPLETFS_GC_LOOP_DELAY=%s", tmp ? tmp : "unset");
-
-        if (tmp)
-                gc_loop_delay = strtoul(tmp, NULL, 10);
-        else
-                gc_loop_delay = DEFAULT_GC_LOOP_DELAY;
-}
-
-static void
-set_gc_age_threshold_env(void)
-{
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_GC_AGE_THRESHOLD");
-        LOG(LOG_DEBUG, "DROPLETFS_GC_AGE_THRESHOLD=%s", tmp ? tmp : "unset");
-
-        if (tmp)
-                gc_age_threshold = strtoul(tmp, NULL, 10);
-        else
-                gc_age_threshold = DEFAULT_GC_AGE_THRESHOLD;
-}
-
-static char *
-log_level_to_str(int level)
-{
-#define case_log(x) case x: return #x
-        switch(level) {
-                case_log(LOG_EMERG);
-                case_log(LOG_ALERT);
-                case_log(LOG_CRIT);
-                case_log(LOG_ERR);
-                case_log(LOG_WARNING);
-                case_log(LOG_NOTICE);
-                case_log(LOG_INFO);
-                case_log(LOG_DEBUG);
-        }
-#undef case_log
-
-        assert(! "impossible case");
-        return "INVALID";
-}
-
-static int
-str_to_log_level(char *str)
-{
-#define case_str(prio) if (! strcmp(str, #prio)) return prio;
-        case_str(LOG_EMERG);
-        case_str(LOG_ALERT);
-        case_str(LOG_CRIT);
-        case_str(LOG_ERR);
-        case_str(LOG_WARNING);
-        case_str(LOG_NOTICE);
-        case_str(LOG_INFO);
-        case_str(LOG_DEBUG);
-#undef case_str
-
-        assert(! "impossible case");
-        return -1;
-}
-
-static void
-set_log_level_env(void)
-{
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_LOG_LEVEL");
-        LOG(LOG_DEBUG, "DROPLETFS_LOG_LEVEL=%s", tmp ? tmp : "unset");
-
-        if (tmp)
-                log_level = str_to_log_level(tmp);
-        else
-                log_level = DEFAULT_LOG_LEVEL;
-
-        if (log_level > LOG_DEBUG || log_level < LOG_EMERG) {
-                fprintf(stderr, "invalid debug level (%d), set to %d",
-                        log_level, DEFAULT_LOG_LEVEL);
-                log_level = DEFAULT_LOG_LEVEL;
-        }
-
-}
-
-static void
-set_compression_env(void)
-{
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_COMPRESSION_METHOD");
-        LOG(LOG_DEBUG, "DROPLETFS_COMPRESSION_METHOD=%s", tmp ? tmp : "unset");
-
-        if (tmp) {
-                if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
-                        compression_method = DEFAULT_COMPRESSION_METHOD;
-                else
-                        compression_method = tmp;
-        } else {
-	  compression_method = DEFAULT_COMPRESSION_METHOD;
-	}
-
-        tmp = getenv("DROPLETFS_ZLIB_LEVEL");
-        LOG(LOG_DEBUG, "DROPLETFS_ZLIB_LEVEL=%s", tmp ? tmp : "unset");
-
-        if (tmp)
-                zlib_level = strtoul(tmp, NULL, 10);
-        else
-                zlib_level = DEFAULT_ZLIB_LEVEL;
-}
-
-static void
-set_max_retry_env(void)
-{
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_MAX_RETRY");
-        LOG(LOG_DEBUG, "DROPLETFS_MAX_RETRY=%s", tmp ? tmp : "unset");
-
-        max_retry = DEFAULT_MAX_RETRY;
-        if (tmp)
-                max_retry = strtoul(tmp, NULL, 10);
-}
-
-static void
-set_dplfs_env(void)
-{
-        set_log_level_env();
-        set_compression_env();
-        set_max_retry_env();
-        set_gc_loop_delay_env();
-        set_gc_age_threshold_env();
-
-        if (-1 == set_cache_dir()) {
-                LOG(LOG_ERR, "can't create any cache directory");
-                exit(EXIT_FAILURE);
-        }
-}
-
 int
-main(int argc, char **argv)
+main(int argc,
+     char **argv)
 {
-        root_mode = 0;
-        log_level = 0;
         hash = NULL;
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
@@ -601,16 +410,8 @@ main(int argc, char **argv)
         ctx->cur_bucket = strdup(bucket);
         droplet_pp(ctx);
 
-        set_dplfs_env();
-        LOG(LOG_ERR, "zlib compression level set to: %lu", zlib_level);
-        LOG(LOG_ERR, "zlib compression method set to: %s", compression_method);
-        LOG(LOG_ERR, "local cache directory set to: %s", cache_dir);
-        LOG(LOG_ERR, "max number of network i/o attempts set to: %d", max_retry);
-        LOG(LOG_ERR, "garbage collector loop delay set to: %d", gc_loop_delay);
-        LOG(LOG_ERR, "garbage collector age threshold set to: %d", gc_age_threshold);
-        if (debug)
-                log_level = LOG_DEBUG;
-        LOG(LOG_ERR, "debug level set to: %d (%s)", log_level, log_level_to_str(log_level));
+        env = env_new();
+        set_dplfs_env(env, debug);
 
         rc = dfs_fuse_main(&args);
 

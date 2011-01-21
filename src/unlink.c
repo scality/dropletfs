@@ -6,12 +6,12 @@
 
 #include "unlink.h"
 #include "hash.h"
-#include "glob.h"
 #include "log.h"
 #include "tmpstr.h"
 
 extern GHashTable *hash;
-extern char *cache_dir;
+extern struct env *env;
+extern dpl_ctx_t *ctx;
 
 int
 dfs_unlink(const char *path)
@@ -31,7 +31,7 @@ dfs_unlink(const char *path)
                 goto end;
         }
 
-        local = tmpstr_printf("%s/%s", cache_dir, path);
+        local = tmpstr_printf("%s/%s", env->cache_dir, path);
         if (-1 == unlink(local))
                 LOG(LOG_INFO, "unlink cache file (%s): %s",
                     local, strerror(errno));

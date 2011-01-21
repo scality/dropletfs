@@ -5,12 +5,13 @@
 #include <time.h>
 
 #include "getattr.h"
-#include "glob.h"
+#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "metadata.h"
 
-extern int max_retry;
+extern dpl_ctx_t *ctx;
+extern struct env *env;
 extern GHashTable *hash;
 
 static void
@@ -108,7 +109,7 @@ dfs_getattr(const char *path,
         st->st_nlink = 1;
 
 	if (strcmp(path, "/") == 0) {
-		st->st_mode = root_mode | S_IFDIR;
+		st->st_mode = S_IFDIR;
                 ret = 0;
                 goto end;
 	}
@@ -124,7 +125,7 @@ dfs_getattr(const char *path,
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc) {
-                if (DPL_ENOENT != rc && (tries < max_retry)) {
+                if (DPL_ENOENT != rc && (tries < env->max_retry)) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
@@ -143,7 +144,7 @@ dfs_getattr(const char *path,
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                if (tries < max_retry) {
+                if (tries < env->max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;

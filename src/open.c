@@ -8,9 +8,10 @@
 #include "glob.h"
 #include "file.h"
 #include "tmpstr.h"
+#include "env.h"
 
 extern GHashTable *hash;
-extern char *cache_dir;
+extern struct env *env;
 
 static int
 populate_hash(GHashTable *h,
@@ -63,7 +64,7 @@ build_cache_tree(const char *path)
         while (path && '/' == *path)
                 path++;
 
-        local = tmpstr_printf("%s/%s", cache_dir, path);
+        local = tmpstr_printf("%s/%s", env->cache_dir, path);
 
         tmp_local = strdup(local);
 

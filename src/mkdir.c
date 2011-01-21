@@ -2,7 +2,8 @@
 
 #include "mkdir.h"
 #include "log.h"
-#include "glob.h"
+
+extern dpl_ctx_t *ctx;
 
 int
 dfs_mkdir(const char *path,

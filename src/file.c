@@ -1,8 +1,9 @@
+#include <droplet.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <errno.h>
 
-#include "glob.h"
+#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "tmpstr.h"
@@ -11,9 +12,8 @@
 
 #define WRITE_BLOCK_SIZE (1000*1000)
 
-extern unsigned long zlib_level;
-extern char *cache_dir;
-extern int max_retry;
+extern struct env *env;
+extern dpl_ctx_t *ctx;
 
 char *
 dfs_ftypetostr(dpl_ftype_t type)
@@ -129,7 +129,7 @@ dfs_md5cmp(pentry_t *pe,
   namei_retry:
         rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
         if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
-                if (tries < max_retry) {
+                if (tries < env->max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
@@ -282,7 +282,7 @@ dfs_get_local_copy(pentry_t *pe,
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
 
-        local = tmpstr_printf("%s/%s", cache_dir, remote);
+        local = tmpstr_printf("%s/%s", env->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
             ctx->cur_bucket, remote, local);
 

@@ -1,8 +1,9 @@
 #include <droplet.h>
 
 #include "readdir.h"
-#include "glob.h"
 #include "log.h"
+
+extern dpl_ctx_t *ctx;
 
 int
 dfs_readdir(const char *path,

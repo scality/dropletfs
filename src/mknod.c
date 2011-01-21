@@ -1,10 +1,10 @@
 #include <droplet.h>
 
 #include "mknod.h"
-#include "glob.h"
 #include "log.h"
 
-extern int max_retry;
+extern dpl_ctx_t *ctx;
+extern struct env *env;
 
 int
 dfs_mknod(const char *path,
@@ -21,7 +21,7 @@ dfs_mknod(const char *path,
         rc = dpl_mknod(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                if (tries < max_retry) {
+                if (tries < env->max_retry) {
                         LOG(LOG_NOTICE, "mknod: timeout? (%s)",
                             dpl_status_str(rc));
                         tries++;

@@ -11,9 +11,7 @@
 #include "hash.h"
 #include "gc.h"
 
-extern int gc_loop_delay;
-extern int gc_age_threshold;
-extern char *cache_dir;
+extern struct env *env;
 
 static void
 gc_callback(gpointer key,
@@ -62,16 +60,16 @@ gc_callback(gpointer key,
         }
 
         t = time(NULL);
-        if (t < st.st_atime + gc_age_threshold &&
-            t < st.st_mtime + gc_age_threshold &&
-            t < st.st_ctime + gc_age_threshold)
+        if (t < st.st_atime + env->gc_age_threshold &&
+            t < st.st_mtime + env->gc_age_threshold &&
+            t < st.st_ctime + env->gc_age_threshold)
                 goto release;
 
         LOG(LOG_DEBUG, "%s file too old: now=%d, atime=%d, mtime=%d, ctime=%d",
             path, (int)t, (int)st.st_atime, (int)st.st_mtime, (int)st.st_ctime);
 
   remove:
-        local = tmpstr_printf("%s/%s", cache_dir, path);
+        local = tmpstr_printf("%s/%s", env->cache_dir, path);
         LOG(LOG_INFO, "removing cache file '%s'", local);
         if (-1 == unlink(local))
                 LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
@@ -94,7 +92,7 @@ thread_gc(void *cb_arg)
         LOG(LOG_DEBUG, "entering thread");
 
         while (1) {
-                sleep(gc_loop_delay);
+                sleep(env->gc_loop_delay);
                 g_hash_table_foreach(hash, gc_callback, hash);
         }
 

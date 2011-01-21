@@ -1,11 +1,11 @@
 #include <droplet.h>
 
+#include "rename.h"
 #include "unlink.h"
 #include "file.h"
 #include "log.h"
-#include "glob.h"
 
-#include "rename.h"
+extern dpl_ctx_t *ctx;
 
 int
 dfs_rename(const char *oldpath,

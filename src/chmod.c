@@ -1,9 +1,12 @@
 #include <droplet.h>
 
-#include "glob.h"
 #include "chmod.h"
 #include "log.h"
 #include "metadata.h"
+#include "env.h"
+
+extern dpl_ctx_t *ctx;
+extern struct env *env;
 
 int
 dfs_chmod(const char *path,

@@ -4,13 +4,14 @@
 
 #include "open.h"
 #include "create.h"
-#include "glob.h"
+#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "metadata.h"
 #include "hash.h"
 
-extern int max_retry;
+extern struct env *env;
+extern dpl_ctx_t *ctx;
 
 int
 dfs_create(const char *path,
@@ -48,7 +49,7 @@ dfs_create(const char *path,
             dpl_status_str(rc));
 
         if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
-                if (tries < max_retry) {
+                if (tries < env->max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
@@ -98,7 +99,7 @@ dfs_create(const char *path,
         rc = dpl_mknod(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                if ((tries < max_retry)) {
+                if ((tries < env->max_retry)) {
                         LOG(LOG_NOTICE, "mknod: timeout? (%s)",
                             dpl_status_str(rc));
                         tries++;

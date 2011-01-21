@@ -6,6 +6,8 @@
 #include "hash.h"
 #include "log.h"
 
+extern struct env *env;
+
 ssize_t pread(int, void *, size_t, off_t);
 
 int

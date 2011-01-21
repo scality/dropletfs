@@ -1,9 +1,12 @@
 #include <droplet.h>
 
-#include "glob.h"
+#include "env.h"
 #include "chown.h"
 #include "log.h"
 #include "metadata.h"
+
+extern dpl_ctx_t *ctx;
+extern struct env *env;
 
 int
 dfs_chown(const char *path,

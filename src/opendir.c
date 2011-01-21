@@ -2,7 +2,8 @@
 
 #include "opendir.h"
 #include "log.h"
-#include "glob.h"
+
+extern dpl_ctx_t *ctx;
 
 int
 dfs_opendir(const char *path,

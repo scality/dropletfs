@@ -3,16 +3,13 @@
 
 #include "release.h"
 #include "tmpstr.h"
-#include "glob.h"
 #include "file.h"
 #include "metadata.h"
 #include "log.h"
 #include "zip.h"
 
-extern unsigned long zlib_level;
-extern char *compression_method;
-extern char *cache_dir;
-extern int max_retry;
+extern dpl_ctx_t *ctx;
+extern struct env *env;
 
 /*
  * compress a file,  set `size' to the resulting file size
@@ -36,7 +33,7 @@ compress_before_sending(FILE *fpsrc,
         int zrc;
 
         LOG(LOG_INFO, "start compression before upload");
-        zrc = zip(fpsrc, fpdst, zlib_level);
+        zrc = zip(fpsrc, fpdst, env->zlib_level);
         if (Z_OK != zrc) {
                 LOG(LOG_ERR, "zip failed: %s", zerr_to_str(zrc));
                 ret = 0;
@@ -142,9 +139,9 @@ dfs_release(const char *path,
         fill_metadata_from_stat(dict, &st);
         fd_tosend = fd;
 
-        local = tmpstr_printf("%s/%s", cache_dir, path);
+        local = tmpstr_printf("%s/%s", env->cache_dir, path);
 
-        if (0 == strncasecmp(compression_method, "zlib", strlen("zlib"))) {
+        if (0 == strncasecmp(env->compression_method, "zlib", strlen("zlib"))) {
                 zlocal = tmpstr_printf("%s.tmp", local);
 
                 fpsrc = fopen(local, "r");
@@ -188,7 +185,7 @@ dfs_release(const char *path,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
-                if (rc != DPL_ENOENT && (tries < max_retry)) {
+                if (rc != DPL_ENOENT && (tries < env->max_retry)) {
                         LOG(LOG_NOTICE,
                             "dpl_openwrite timeout? (delay=%d, vfile@%p)",
                             delay, (void *)vfile);
