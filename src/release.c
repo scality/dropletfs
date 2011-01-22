@@ -14,7 +14,6 @@ extern struct env *env;
 /*
  * compress a file,  set `size' to the resulting file size
  *
- * return the size of the compressed file
  * ret = 0 -> no compression
  * ret < 0 -> an error occurred
  * ret > 0 -> everything's ok
