@@ -120,7 +120,7 @@ open_read_write(const char * const path,
 
 static int
 open_read_only(const char * const path,
-                pentry_t *pe)
+               pentry_t *pe)
 {
         int ret;
         int fd;
@@ -150,6 +150,7 @@ dfs_open(const char *path,
         pentry_t *pe = NULL;
         int fd = -1;
         int ret = -1;
+        int mode;
 
         info->fh = 0;
         LOG(LOG_DEBUG, "path=%s %s", path, flag_to_str(info));
@@ -170,8 +171,9 @@ dfs_open(const char *path,
         info->fh = (uint64_t)pe;
         pentry_inc_refcount(pe);
 
-        if (O_RDONLY != (info->flags & O_ACCMODE)) {
-                LOG(LOG_DEBUG, "trylock(%s) ...", path);
+        mode = info->flags & O_ACCMODE;
+
+        if (O_RDONLY != mode) {
                 if (pentry_lock(pe)) {
                         LOG(LOG_DEBUG, "... %s not locked!", path);
                         ret = -1;
@@ -181,18 +183,18 @@ dfs_open(const char *path,
                 LOG(LOG_DEBUG, "... %s locked!", path);
         }
 
-        if (O_RDONLY != (info->flags & O_ACCMODE)) {
-                if (-1 == open_read_write(path, pe)) {
-                        ret = -1;
-                        pentry_dec_refcount(pe);
-                        goto err;
-                }
-        } else {
-                if (-1 == open_read_only(path, pe)) {
-                        ret = -1;
-                        pentry_dec_refcount(pe);
-                        goto err;
-                }
+        info->fh = (uint64_t)pe;
+
+        /* TODO: add other states for O_APPEND, etc. */
+        int (*fn[])(const char *, pentry_t *) = {
+                [O_RDONLY] = open_read_only,
+                [O_WRONLY] = open_read_write,
+                [O_RDWR]   = open_read_write,
+        };
+
+        if (-1 == fn[mode](path, pe)) {
+                ret = -1;
+                goto err;
         }
 
         ret = 0;
