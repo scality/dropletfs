@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <droplet.h>
 #include <libgen.h>
 #include <unistd.h>
@@ -16,7 +17,7 @@ extern struct env *env;
 extern dpl_ctx_t *ctx;
 
 char *
-dfs_ftypetostr(dpl_ftype_t type)
+ftype_to_str(dpl_ftype_t type)
 {
         switch (type) {
         case DPL_FTYPE_REG:
@@ -27,6 +28,21 @@ dfs_ftypetostr(dpl_ftype_t type)
         return "unknown type";
 }
 
+char *
+flag_to_str(struct fuse_file_info *info)
+{
+        switch (info->flags & O_ACCMODE) {
+        case O_RDONLY:
+                return "read only";
+        case O_WRONLY:
+                return "write only";
+        case O_RDWR:
+                return "read/write";
+        }
+
+        assert(! "impossible");
+        return "invalid";
+}
 
 int
 write_all(int fd,
@@ -294,7 +310,7 @@ dfs_get_local_copy(pentry_t *pe,
                 goto end;
         }
 
-        /* a cache file already exist, its MD5 digest is different, so
+        /* a cache file already exists, its MD5 digest is different, so
          * just remove it */
         if (0 == access(local, F_OK)) {
                 LOG(LOG_DEBUG, "removing cache file '%s'", local);

@@ -10,6 +10,7 @@
 #include "env.h"
 #include "log.h"
 #include "tmpstr.h"
+#include "regex.h"
 
 #define DEFAULT_COMPRESSION_METHOD "NONE"
 #define DEFAULT_ZLIB_LEVEL 3
@@ -18,6 +19,7 @@
 #define DEFAULT_GC_LOOP_DELAY 60
 #define DEFAULT_GC_AGE_THRESHOLD 600
 #define DEFAULT_LOG_LEVEL LOG_ERR
+#define DEFAULT_EXCLUSION_REGEXP NULL
 
 extern struct env *env;
 extern dpl_ctx_t *ctx;
@@ -48,7 +50,6 @@ env_set_cache_dir(struct env *env)
         int ret;
 
         tmp = getenv("DROPLETFS_CACHE_DIR");
-        LOG(LOG_DEBUG, "DROPLETFS_CACHE_DIR=%s", tmp ? tmp : "unset");
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
@@ -63,14 +64,13 @@ env_set_cache_dir(struct env *env)
 
         env->cache_dir = strdup(cache);
         if (! env->cache_dir) {
-                LOG(LOG_CRIT, "strdup(%s): %s", cache, strerror(errno));
+                perror("strdup");
                 ret = -1;
                 goto err;
         }
 
         if (-1 == mkdir(env->cache_dir, 0777) && EEXIST != errno) {
-                LOG(LOG_DEBUG, "mkdir(%s) = %s",
-                    env->cache_dir, strerror(errno));
+                perror("mkdir");
                 ret = -1;
                 goto err;
         }
@@ -81,7 +81,6 @@ env_set_cache_dir(struct env *env)
                 *p = 0;
                 p--;
         }
-        LOG(LOG_DEBUG, "cache directory created: '%s'", env->cache_dir);
 
         ret = 0;
   err:
@@ -94,7 +93,6 @@ env_set_gc_loop_delay(struct env *env)
         char *tmp = NULL;
 
         tmp = getenv("DROPLETFS_GC_LOOP_DELAY");
-        LOG(LOG_DEBUG, "DROPLETFS_GC_LOOP_DELAY=%s", tmp ? tmp : "unset");
 
         if (tmp)
                 env->gc_loop_delay = strtoul(tmp, NULL, 10);
@@ -108,7 +106,6 @@ env_set_gc_age_threshold(struct env *env)
         char *tmp = NULL;
 
         tmp = getenv("DROPLETFS_GC_AGE_THRESHOLD");
-        LOG(LOG_DEBUG, "DROPLETFS_GC_AGE_THRESHOLD=%s", tmp ? tmp : "unset");
 
         if (tmp)
                 env->gc_age_threshold = strtoul(tmp, NULL, 10);
@@ -155,20 +152,11 @@ str_to_log_level(char *str)
 }
 
 static void
-env_set_log_level(struct env *env,
-                  int debug)
+env_set_log_level(struct env *env)
 {
         char *tmp = NULL;
 
-        if (debug) {
-                env->log_level = LOG_DEBUG;
-                LOG(LOG_INFO, "log level forced to %s",
-                    log_level_to_str(env->log_level));
-                return;
-        }
-
         tmp = getenv("DROPLETFS_LOG_LEVEL");
-        LOG(LOG_DEBUG, "DROPLETFS_LOG_LEVEL=%s", tmp ? tmp : "unset");
 
         if (tmp)
                 env->log_level = str_to_log_level(tmp);
@@ -189,7 +177,6 @@ env_set_compression(struct env *env)
         char *tmp = NULL;
 
         tmp = getenv("DROPLETFS_COMPRESSION_METHOD");
-        LOG(LOG_DEBUG, "DROPLETFS_COMPRESSION_METHOD=%s", tmp ? tmp : "unset");
 
         if (tmp) {
                 if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
@@ -201,7 +188,6 @@ env_set_compression(struct env *env)
 	}
 
         tmp = getenv("DROPLETFS_ZLIB_LEVEL");
-        LOG(LOG_DEBUG, "DROPLETFS_ZLIB_LEVEL=%s", tmp ? tmp : "unset");
 
         if (tmp)
                 env->zlib_level = strtoul(tmp, NULL, 10);
@@ -215,28 +201,63 @@ env_set_max_retry(struct env *env)
         char *tmp = NULL;
 
         tmp = getenv("DROPLETFS_MAX_RETRY");
-        LOG(LOG_DEBUG, "DROPLETFS_MAX_RETRY=%s", tmp ? tmp : "unset");
 
         env->max_retry = DEFAULT_MAX_RETRY;
         if (tmp)
                 env->max_retry = strtoul(tmp, NULL, 10);
 }
 
+static void
+env_set_exclusion_pattern(struct env *env)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_EXCLUSION_PATTERN");
+
+        (void)re_ctor(&env->regex, tmp, REG_EXTENDED);
+}
+
 void
-set_dplfs_env(struct env *env,
+env_set_debug(struct env *env,
               int debug)
 {
-        env_set_log_level(env, debug);
+        if (debug)
+                env->log_level = LOG_DEBUG;
+}
+
+void
+env_ctor(struct env *env)
+{
+        env_set_log_level(env);
         env_set_compression(env);
         env_set_max_retry(env);
         env_set_gc_loop_delay(env);
         env_set_gc_age_threshold(env);
+        env_set_exclusion_pattern(env);
 
         if (-1 == env_set_cache_dir(env)) {
-                LOG(LOG_ERR, "can't create any cache directory");
+                fprintf(stderr, "can't create any cache directory");
                 exit(EXIT_FAILURE);
         }
+}
 
+void
+env_dtor(struct env *env)
+{
+        if (env->regex.set)
+                re_dtor(&env->regex);
+}
+
+void
+env_free(struct env *env)
+{
+        env_dtor(env);
+        free(env);
+}
+
+void
+env_log(struct env *env)
+{
         LOG(LOG_ERR, "zlib compression level set to: %d",
             env->zlib_level);
         LOG(LOG_ERR, "zlib compression method set to: %s",
@@ -251,5 +272,5 @@ set_dplfs_env(struct env *env,
             env->gc_age_threshold);
         LOG(LOG_ERR, "debug level set to: %d (%s)",
             env->log_level, log_level_to_str(env->log_level));
-
+        LOG(LOG_ERR, "exclusion regex set to: '%s'", env->regex.str);
 }

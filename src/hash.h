@@ -26,6 +26,12 @@ int pentry_unlock(pentry_t *);
 void pentry_inc_refcount(pentry_t *);
 void pentry_dec_refcount(pentry_t *);
 
+char * pentry_get_path(pentry_t *);
+void pentry_set_path(pentry_t *, const char *);
+
+void pentry_set_exclude(pentry_t *, int);
+int pentry_get_exclude(pentry_t *);
+
 int pentry_get_flag(pentry_t *);
 void pentry_set_flag(pentry_t *, int);
 

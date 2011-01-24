@@ -46,14 +46,18 @@ dfs_getattr_cached(pentry_t *pe,
 {
         int ret;
         int fd;
+        int exclude;
 
+        exclude = pentry_get_exclude(pe);
         fd = pentry_get_fd(pe);
-        LOG(LOG_DEBUG, "pe@%p, fd=%d", (void *)pe, fd);
+        LOG(LOG_DEBUG, "path=%s, pe@%p, fd=%d",
+            pentry_get_path(pe), (void *)pe, fd);
 
         /* if the flag is CLEAN, then the file was successfully uploaded,
          * just grab its metadata */
-        if (FLAG_CLEAN == pentry_get_flag(pe)) {
-                LOG(LOG_INFO, "file upload is finished");
+        if (FLAG_CLEAN == pentry_get_flag(pe) && !exclude) {
+                LOG(LOG_INFO, "path=%s, file upload is finished",
+                    pentry_get_path(pe));
                 ret = -1;
                 goto end;
         }
@@ -66,8 +70,8 @@ dfs_getattr_cached(pentry_t *pe,
                 goto end;
         }
 
-        LOG(LOG_INFO, "use the cache file descriptor (%d) to fill struct stat",
-            fd);
+        LOG(LOG_INFO, "path=%s, use the cache fd (%d) to fill struct stat",
+            pentry_get_path(pe), fd);
         ret = 0;
   end:
         return ret;
@@ -120,8 +124,8 @@ dfs_getattr(const char *path,
         rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
                        ino, &parent_ino, &obj_ino, &type);
 
-        LOG(LOG_DEBUG, "dpl_namei: %s, type=%s, parent_ino=%s, obj_ino=%s",
-            dpl_status_str(rc), dfs_ftypetostr(type),
+        LOG(LOG_DEBUG, "path=%s, dpl_namei: %s, type=%s, parent_ino=%s, obj_ino=%s",
+            path, dpl_status_str(rc), ftype_to_str(type),
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc) {
@@ -129,11 +133,12 @@ dfs_getattr(const char *path,
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG(LOG_NOTICE, "namei timeout? (%s)",
-                            dpl_status_str(rc));
+                        LOG(LOG_NOTICE, "path=%s, namei timeout? (%s)",
+                            path, dpl_status_str(rc));
                         goto namei_retry;
                 }
-                LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "path=%s, dpl_namei: %s",
+                    path, dpl_status_str(rc));
                 ret = rc;
                 goto end;
         }
@@ -148,8 +153,8 @@ dfs_getattr(const char *path,
                         tries++;
                         sleep(delay);
                         delay *= 2;
-                        LOG(LOG_NOTICE, "getattr timeout? (%s)",
-                            dpl_status_str(rc));
+                        LOG(LOG_NOTICE, "path=%s, getattr timeout? (%s)",
+                            path, dpl_status_str(rc));
                         goto getattr_retry;
                 }
                 LOG(LOG_ERR, "dpl_getattr: %s", dpl_status_str(rc));

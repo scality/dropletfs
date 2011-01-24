@@ -10,7 +10,12 @@ GLIB_CFLAGS=$(shell pkg-config --cflags glib-2.0)
 GLIB_LDFLAGS=$(shell pkg-config --libs glib-2.0)
 
 CPPFLAGS+=
-LDFLAGS+=-ldroplet -lssl -lxml2 $(FUSE_LDFLAGS) $(GLIB_LDFLAGS) -L$(DPL_LIB_DIR)
+LDFLAGS+=-ldroplet 		\
+	-lssl			\
+	-lxml2			\
+	$(FUSE_LDFLAGS)		\
+	$(GLIB_LDFLAGS)		\
+	-L$(DPL_LIB_DIR)
 
 CFLAGS+=-Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 CFLAGS+=-Wall -Werror

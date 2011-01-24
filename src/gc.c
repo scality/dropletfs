@@ -74,6 +74,7 @@ gc_callback(gpointer key,
         if (-1 == unlink(local))
                 LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
 
+        LOG(LOG_DEBUG, "path=%s remove from the hashtable", path);
         if (FALSE == g_hash_table_remove(hash, path))
                 LOG(LOG_WARNING, "can't remove the cell from the hashtable");
 

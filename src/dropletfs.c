@@ -41,6 +41,7 @@
 
 #include "env.h"
 #include "gc.h"
+#include "regex.h"
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
@@ -170,10 +171,16 @@ dfs_destroy(void *arg)
 {
         LOG(LOG_DEBUG, "%p", arg);
 
+        if (env) {
+                LOG(LOG_DEBUG, "releasing env memory");
+                env_free(env);
+        }
+
         if (hash) {
                 LOG(LOG_DEBUG, "releasing hashtable memory");
                 g_hash_table_remove_all(hash);
         }
+
         LOG(LOG_DEBUG, "freeing libdroplet context");
 	dpl_free();
 }
@@ -360,7 +367,8 @@ droplet_pp(dpl_ctx_t *ctx)
 static void
 usage(const char * const prog)
 {
-        printf("Usage: %s <bucket> [-d] <mount point> [options]\n", prog);
+        printf("Usage: %s <bucket> [-d] [-x pattern] <mountpoint> [options]\n",
+               prog);
         printf("\t<bucket>\tthe name of your remote bucket\n");
         printf("\t-d\t\tset the debug mode. Information are written in syslog\n");
         printf("\t<mountpoint>\tthe directory you want to use as mount point.\n");
@@ -376,6 +384,7 @@ main(int argc,
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
         int debug = 0;
+        char *exclusion_pattern = NULL;
 
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
 
@@ -388,17 +397,21 @@ main(int argc,
         argc -= 1;
         argv += 1;
 
-        if (0 == strncmp(argv[1], "-d", 2)) {
+        if (0 == strncmp(argv[0], "-d", 2)) {
                 debug = 1;
-                argc -= 1;
-                argv += 1;
+                argc--;
+                argv++;
         }
 
-        struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+        if (0 == strncmp(argv[0], "-x", 2)) {
+                argc--;
+                argv++;
+                exclusion_pattern = strdup(argv[0]);
+        }
 
 	rc = dpl_init();
 	if (DPL_SUCCESS != rc) {
-		fprintf(fp, "dpl_init: %s\n", dpl_status_str(rc));
+		fprintf(stderr, "dpl_init: %s\n", dpl_status_str(rc));
                 goto err1;
 	}
 
@@ -407,12 +420,21 @@ main(int argc,
                 goto err2;
 
         ctx->trace_level = 0;
+
         ctx->cur_bucket = strdup(bucket);
+        if (! ctx->cur_bucket) {
+                fprintf(stderr, "strdup('%s') failed", bucket);
+                goto err2;
+        }
+
         droplet_pp(ctx);
 
         env = env_new();
-        set_dplfs_env(env, debug);
+        env_ctor(env);
+        env_set_debug(env, debug);
+        env_log(env);
 
+        struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
         rc = dfs_fuse_main(&args);
 
         dpl_ctx_free(ctx);

@@ -42,6 +42,7 @@ populate_hash(GHashTable *h,
                 goto err;
         }
 
+        pentry_set_path(pe, path);
         *pep = pe;
         g_hash_table_insert(h, key, pe);
 
@@ -150,8 +151,8 @@ dfs_open(const char *path,
         int fd = -1;
         int ret = -1;
 
-        LOG(LOG_DEBUG, "path=%s", path);
-        PRINT_FLAGS(path, info);
+        info->fh = 0;
+        LOG(LOG_DEBUG, "path=%s %s", path, flag_to_str(info));
 
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
@@ -166,25 +167,30 @@ dfs_open(const char *path,
                 LOG(LOG_INFO, "%s: found in the hashtable, fd=%d", path, fd);
         }
 
+        info->fh = (uint64_t)pe;
         pentry_inc_refcount(pe);
 
         if (O_RDONLY != (info->flags & O_ACCMODE)) {
+                LOG(LOG_DEBUG, "trylock(%s) ...", path);
                 if (pentry_lock(pe)) {
+                        LOG(LOG_DEBUG, "... %s not locked!", path);
                         ret = -1;
+                        pentry_dec_refcount(pe);
                         goto err;
                 }
+                LOG(LOG_DEBUG, "... %s locked!", path);
         }
 
-        info->fh = (uint64_t)pe;
-
-        if (O_WRONLY == (info->flags & O_ACCMODE)) {
+        if (O_RDONLY != (info->flags & O_ACCMODE)) {
                 if (-1 == open_read_write(path, pe)) {
                         ret = -1;
+                        pentry_dec_refcount(pe);
                         goto err;
                 }
         } else {
                 if (-1 == open_read_only(path, pe)) {
                         ret = -1;
+                        pentry_dec_refcount(pe);
                         goto err;
                 }
         }

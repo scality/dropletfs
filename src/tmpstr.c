@@ -6,8 +6,6 @@
 int vsnprintf(char *, size_t, const char *, va_list);
 
 
-#define TMPSTR_MAX  2048
-#define TMPSTR_NB 32
 
 static __thread char strings[TMPSTR_NB][TMPSTR_MAX];
 static __thread unsigned current;

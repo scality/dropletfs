@@ -9,6 +9,7 @@
 #include "file.h"
 #include "metadata.h"
 #include "hash.h"
+#include "regex.h"
 
 extern struct env *env;
 extern dpl_ctx_t *ctx;
@@ -28,8 +29,10 @@ dfs_create(const char *path,
         dpl_dict_t *meta = NULL;
         int tries = 0;
         int delay = 1;
+        int exclude;
 
-        LOG(LOG_DEBUG, "%s, mode=0x%x", path, (unsigned)mode);
+        LOG(LOG_DEBUG, "%s, mode=0x%x, %s",
+            path, (unsigned)mode, flag_to_str(info));
         PRINT_FLAGS(path, info);
 
         if (! S_ISREG(mode)) {
@@ -38,37 +41,45 @@ dfs_create(const char *path,
                 goto err;
         }
 
-        ino = dpl_cwd(ctx, ctx->cur_bucket);
+        exclude = re_match(&env->regex, path);
 
- namei_retry:
-        rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                       ino, &parent, &obj, &type);
+        if (! exclude) {
+                ino = dpl_cwd(ctx, ctx->cur_bucket);
 
-        LOG(LOG_DEBUG, "path=%s, ino=%s, parent=%s, obj=%s, type=%s, rc=%s",
-            path, ino.key, parent.key, obj.key, dfs_ftypetostr(type),
-            dpl_status_str(rc));
+          namei_retry:
+                rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
+                               ino, &parent, &obj, &type);
 
-        if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
-                if (tries < env->max_retry) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "namei timeout? (%s)",
-                            dpl_status_str(rc));
-                        goto namei_retry;
+                LOG(LOG_DEBUG, "path=%s, ino=%s, parent=%s, obj=%s, type=%s",
+                    path, ino.key, parent.key, obj.key, ftype_to_str(type));
+
+                if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
+                        if (tries < env->max_retry) {
+                                tries++;
+                                sleep(delay);
+                                delay *= 2;
+                                LOG(LOG_NOTICE, "namei timeout? (%s)",
+                                    dpl_status_str(rc));
+                                goto namei_retry;
+                        }
+                        /* TODO handle the following cases here:
+                         *   - we do not have permissions to do so
+                         */
+                        LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                        ret = -1;
+                        goto err;
                 }
-                /* TODO handle the following cases here:
-                 *   - we overwrite the current file
-                 *   - we do not have permissions to do so
-                 */
-                LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
-                ret = -1;
-                goto err;
         }
 
         (void)dfs_open(path, info);
 
         pe = (pentry_t *)info->fh;
+        if (! pe) {
+                ret = -1;
+                goto err;
+        }
+
+        pentry_set_exclude(pe, exclude);
 
         fd = pentry_get_fd(pe);
         if (-1 == fd) {
@@ -93,27 +104,30 @@ dfs_create(const char *path,
         fill_metadata_from_stat(meta, &st);
         assign_meta_to_dict(meta, "mode", &mode);
 
-        delay = 1;
-        tries = 0;
-  retry:
-        rc = dpl_mknod(ctx, (char *)path);
+        if (! exclude) {
+                delay = 1;
+                tries = 0;
+          retry:
+                rc = dpl_mknod(ctx, (char *)path);
 
-        if (DPL_SUCCESS != rc) {
-                if ((tries < env->max_retry)) {
-                        LOG(LOG_NOTICE, "mknod: timeout? (%s)",
-                            dpl_status_str(rc));
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        goto retry;
+                if (DPL_SUCCESS != rc) {
+                        if ((tries < env->max_retry)) {
+                                LOG(LOG_NOTICE, "mknod: timeout? (%s)",
+                                    dpl_status_str(rc));
+                                tries++;
+                                sleep(delay);
+                                delay *= 2;
+                                goto retry;
+                        }
+                        LOG(LOG_ERR, "dpl_mknod (%s)", dpl_status_str(rc));
+                        ret = -1;
+                        goto err;
                 }
-                LOG(LOG_ERR, "dpl_mknod (%s)", dpl_status_str(rc));
-                ret = -1;
-                goto err;
         }
 
         ret = 0;
   err:
         LOG(LOG_DEBUG, "exiting function (return value=%d)", ret);
         return ret;
+
 }

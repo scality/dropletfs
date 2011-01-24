@@ -102,7 +102,7 @@ dfs_release(const char *path,
         int tries = 0;
         int delay = 1;
 
-        LOG(LOG_DEBUG, "path=%s", path);
+        LOG(LOG_DEBUG, "path=%s, %s", path, flag_to_str(info));
         PRINT_FLAGS(path, info);
 
         pe = (pentry_t *)info->fh;
@@ -112,6 +112,7 @@ dfs_release(const char *path,
         }
 
         fd = pentry_get_fd(pe);
+
         if (fd < 0) {
                 LOG(LOG_ERR, "unusable file descriptor fd=%d", fd);
                 goto err;
@@ -129,9 +130,16 @@ dfs_release(const char *path,
         /* We opened a file but we do not want to update it on the server since
          * it was for read-only purposes */
         if (O_RDONLY == (info->flags & O_ACCMODE)) {
-                LOG(LOG_DEBUG, "fd=%d was opened in O_RDONLY mode", fd);
+                LOG(LOG_INFO, "path=%s, fd=%d was opened in O_RDONLY mode",
+                    pentry_get_path(pe), fd);
                 ret = 0;
                 goto end;
+        }
+
+        if (pentry_get_exclude(pe)) {
+                LOG(LOG_INFO, "%s: matches a -x regex, don't upload", path);
+                ret = 0;
+                goto exc;
         }
 
         size = st.st_size;
@@ -217,11 +225,6 @@ dfs_release(const char *path,
                 }
         }
 
-        if (pe) {
-                pentry_set_flag(pe, FLAG_CLEAN);
-                (void)pentry_unlock(pe);
-        }
-
         if (fpsrc)
                 fclose(fpsrc);
 
@@ -236,6 +239,14 @@ dfs_release(const char *path,
                 LOG(LOG_INFO, "removing cache file '%s'", zlocal);
                 if (-1 == unlink(zlocal))
                         LOG(LOG_ERR, "unlink: %s", strerror(errno));
+        }
+
+  exc:
+        if (pe) {
+                pentry_set_flag(pe, FLAG_CLEAN);
+                LOG(LOG_DEBUG, "unlock(%s) ...", path);
+                (void)pentry_unlock(pe);
+                LOG(LOG_DEBUG, "... %s unlocked!", path);
         }
 
   end:

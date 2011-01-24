@@ -14,12 +14,14 @@ extern GHashTable *hash;
 /* path entry on remote storage file system */
 struct pentry {
         int fd;
+        char *path;
         struct stat st;
         char digest[MD5_DIGEST_LENGTH];
         dpl_dict_t *metadata;
         pthread_mutex_t mutex;
         sem_t refcount;
         int flag;
+        int exclude;
 };
 
 
@@ -59,6 +61,8 @@ pentry_new(void)
                 goto release;
         }
 
+        pe->path = NULL;
+        pe->exclude = 0;
         pe->flag = FLAG_DIRTY;
         return pe;
 
@@ -76,6 +80,9 @@ pentry_free(pentry_t *pe)
         if (pe->metadata)
                 dpl_dict_free(pe->metadata);
 
+        if (pe->path)
+                free(pe->path);
+
         (void)pthread_mutex_destroy(&pe->mutex);
         (void)sem_destroy(&pe->refcount);
 
@@ -89,8 +96,8 @@ pentry_inc_refcount(pentry_t *pe)
 
 
         if (-1 == sem_post(&pe->refcount))
-                LOG(LOG_INFO, "sem_post@%p: %s",
-                    (void *)&pe->refcount, strerror(errno));
+                LOG(LOG_INFO, "path=%s, sem_post@%p: %s",
+                    pe->path, (void *)&pe->refcount, strerror(errno));
 }
 
 void
@@ -100,8 +107,8 @@ pentry_dec_refcount(pentry_t *pe)
 
 
         if (-1 == sem_wait(&pe->refcount))
-                LOG(LOG_INFO, "sem_wait@%p: %s",
-                    (void *)&pe->refcount, strerror(errno));
+                LOG(LOG_INFO, "path=%s, sem_wait@%p: %s",
+                    pe->path, (void *)&pe->refcount, strerror(errno));
 }
 
 int
@@ -115,6 +122,47 @@ pentry_get_refcount(pentry_t *pe)
         return ret;
 }
 
+char *
+pentry_get_path(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->path;
+}
+
+void
+pentry_set_path(pentry_t *pe,
+                const char *path)
+{
+        assert(pe);
+
+        if (! path) {
+                LOG(LOG_ERR, "empty path");
+                return;
+        }
+
+        pe->path = strdup(path);
+        if (! pe->path)
+                LOG(LOG_CRIT, "strdup(%s): %s", path, strerror(errno));
+}
+
+void
+pentry_set_exclude(pentry_t *pe,
+                   int exclude)
+{
+        assert(pe);
+
+        pe->exclude = exclude;
+}
+
+int
+pentry_get_exclude(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->exclude;
+}
+
 int
 pentry_trylock(pentry_t *pe)
 {
@@ -124,8 +172,8 @@ pentry_trylock(pentry_t *pe)
 
         ret = pthread_mutex_trylock(&pe->mutex);
 
-        LOG(LOG_DEBUG, "mutex@%p, fd=%d: %saquired",
-            (void *)&pe->mutex, pe->fd, ret ? "not " : "");
+        LOG(LOG_DEBUG, "mutex@%p, path=%s fd=%d: %sacquired",
+            (void *)&pe->mutex, pe->path, pe->fd, ret ? "not " : "");
 
         return ret;
 }
@@ -139,11 +187,11 @@ pentry_lock(pentry_t *pe)
 
         ret = pthread_mutex_lock(&pe->mutex);
         if (ret)
-                LOG(LOG_ERR, "mutex@%p: %s",
-                    (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "path=%s, mutex@%p: %s",
+                    pe->path, (void *)&pe->mutex, strerror(errno));
         else
-                LOG(LOG_DEBUG, "mutex@%p, fd=%d: acquired",
-                    (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "path=%s; mutex@%p, fd=%d: acquired",
+                    pe->path, (void *)&pe->mutex, pe->fd);
 
 
         return ret;
@@ -158,11 +206,11 @@ pentry_unlock(pentry_t *pe)
 
         ret = pthread_mutex_unlock(&pe->mutex);
         if (ret)
-                LOG(LOG_ERR, "mutex@%p: %s",
-                    (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "path=%s, mutex@%p: %s",
+                    pe->path, (void *)&pe->mutex, strerror(errno));
         else
-                LOG(LOG_DEBUG, "mutex@%p, fd=%d: released",
-                    (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "path=%s, mutex@%p, fd=%d: released",
+                    pe->path, (void *)&pe->mutex, pe->fd);
 
         return ret;
 }
@@ -248,8 +296,8 @@ print(void *key, void *data, void *user_data)
 {
         char *path = key;
         pentry_t *pe = data;
-        LOG(LOG_DEBUG, "key=%s, fd=%d, digest=%.*s",
-            path, pe->fd, MD5_DIGEST_LENGTH, pe->digest);
+        LOG(LOG_DEBUG, "key=%s, path=%s, fd=%d, digest=%.*s",
+            path, pe->path, pe->fd, MD5_DIGEST_LENGTH, pe->digest);
 }
 
 void
