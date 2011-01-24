@@ -26,6 +26,7 @@ gc_callback(gpointer key,
         time_t t;
         char *local = NULL;
         int refcount = 0;
+        int threshold = env->gc_age_threshold;
 
         assert(pe);
 
@@ -59,10 +60,13 @@ gc_callback(gpointer key,
                 goto remove;
         }
 
+        if (pentry_get_exclude(pe))
+                threshold *= 10;
+
         t = time(NULL);
-        if (t < st.st_atime + env->gc_age_threshold &&
-            t < st.st_mtime + env->gc_age_threshold &&
-            t < st.st_ctime + env->gc_age_threshold)
+        if (t < st.st_atime + threshold &&
+            t < st.st_mtime + threshold &&
+            t < st.st_ctime + threshold)
                 goto release;
 
         LOG(LOG_DEBUG, "%s file too old: now=%d, atime=%d, mtime=%d, ctime=%d",
@@ -92,9 +96,11 @@ thread_gc(void *cb_arg)
 
         LOG(LOG_DEBUG, "entering thread");
 
-        while (1) {
-                sleep(env->gc_loop_delay);
-                g_hash_table_foreach(hash, gc_callback, hash);
+        if (env->gc_loop_delay && env->gc_age_threshold) {
+                while (1) {
+                        sleep(env->gc_loop_delay);
+                        g_hash_table_foreach(hash, gc_callback, hash);
+                }
         }
 
         return NULL;
