@@ -49,6 +49,25 @@ set it to a directory in a partition with a bunch of available GB.
 
 You can change its value through DROPLETFS_CACHE_DIR.  Default is /tmp.
 
+ - Garbage collection
+
+DROPLETFS_GC_AGE_THRESHOLD (in seconds): a cache file older than this value
+will be removed.  If zero, the garbage collection is not triggered. Default
+is 0.
+DROPLETFS_GC_LOOP_DELAY (in seconds): the GC is invoked with this period.
+Default is 60.
+
+ - Filename pattern exclusion
+
+In some specific cases, we do not want to upload some files on remote
+storage (for example temporary files in scientific computing).  To handle
+this, you can set DROPLETFS_EXCLUSION_PATTERN to a regular expression.
+
+$ export DROPLETFS_EXCLUSION_PATTERN='\.tmp$|\.foo$' to exclude all the
+files ending in .tmp or .foo
+
+This feature is *experimental*, we do not recommend using it unless you know
+exactly what you're doing.
 
 4. FIRST RUN
 ============
