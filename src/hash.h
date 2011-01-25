@@ -19,6 +19,8 @@ void hash_print_all(void);
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
 
+void pentry_unlink_cache_file(pentry_t *);
+
 int pentry_lock(pentry_t *);
 int pentry_trylock(pentry_t *);
 int pentry_unlock(pentry_t *);

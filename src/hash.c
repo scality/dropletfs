@@ -90,6 +90,18 @@ pentry_free(pentry_t *pe)
 }
 
 void
+pentry_unlink_cache_file(pentry_t *pe)
+{
+        assert(pe);
+
+        if (! pe->path)
+                return;
+
+        if (-1 == unlink(pe->path))
+                LOG(LOG_INFO, "unlink(%s): %s", pe->path, strerror(errno));
+}
+
+void
 pentry_inc_refcount(pentry_t *pe)
 {
         assert(pe);

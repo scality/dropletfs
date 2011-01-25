@@ -167,16 +167,31 @@ dfs_init(struct fuse_conn_info *conn)
 }
 
 static void
+cb_hash_unlink(gpointer key,
+               gpointer value,
+               gpointer user_data)
+{
+        (void)key;
+        (void)user_data;
+        pentry_t *pe = value;
+
+        if (pe)
+                pentry_unlink_cache_file(pe);
+}
+
+static void
 dfs_destroy(void *arg)
 {
         LOG(LOG_DEBUG, "%p", arg);
 
         if (env) {
-                LOG(LOG_DEBUG, "releasing env memory");
+                LOG(LOG_DEBUG, "releasing environment memory");
                 env_free(env);
         }
 
         if (hash) {
+                LOG(LOG_DEBUG, "removing cache files");
+                g_hash_table_foreach(hash, cb_hash_unlink, NULL);
                 LOG(LOG_DEBUG, "releasing hashtable memory");
                 g_hash_table_remove_all(hash);
         }
