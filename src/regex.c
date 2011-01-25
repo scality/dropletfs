@@ -15,7 +15,7 @@ re_ctor(struct re *re,
         int rc;
 
         re->set = 0;
-        if (! pattern) {
+        if (! pattern || ! *pattern) {
                 ret = -1;
                 goto err;
         }
