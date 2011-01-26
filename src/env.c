@@ -147,8 +147,8 @@ str_to_log_level(char *str)
         case_str(LOG_DEBUG);
 #undef case_str
 
-        assert(! "impossible case");
-        return -1;
+        /* the environment variable was set with an erroneous value */
+        return DEFAULT_LOG_LEVEL;
 }
 
 static void
