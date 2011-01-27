@@ -122,29 +122,24 @@ cb_get_buffered(void *arg,
 }
 
 static int
-dfs_md5cmp(pentry_t *pe,
-           char *path)
+remote_file_exists(const char * const path,
+                   dpl_ino_t *obj_inop)
 {
-        dpl_dict_t *dict = NULL;
-        char *remote_md5 = NULL;
-        int ret;
-        int diff = 1;
         dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
-        char *digest = NULL;
         int tries = 0;
         int delay = 1;
-
-        digest = pentry_get_digest(pe);
-        if (! digest) {
-                LOG(LOG_DEBUG, "no digest");
-                ret = 1;
-                goto err;
-        }
+        int ret;
 
   namei_retry:
-        rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
-        if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
+        rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
+
+        if (DPL_ENOENT == rc) {
+                ret = 0;
+                goto end;
+        }
+
+        if (DPL_SUCCESS != rc) {
                 if (tries < env->max_retry) {
                         tries++;
                         sleep(delay);
@@ -154,6 +149,36 @@ dfs_md5cmp(pentry_t *pe,
                         goto namei_retry;
                 }
                 LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                ret = 0;
+                goto end;
+        }
+
+        ret = 1;
+  end:
+        if (obj_inop)
+                *obj_inop = obj_ino;
+
+        LOG(LOG_DEBUG, "path=%s: does%s exist", path, (0 == ret) ? " not" : "");
+        return ret;
+}
+
+/* compare the MD5 values of a cache file and a remote one.  We suppose the
+ * remote file exists */
+static int
+dfs_md5cmp(pentry_t *pe,
+           char *path,
+           dpl_ino_t obj_ino)
+{
+        dpl_dict_t *dict = NULL;
+        char *remote_md5 = NULL;
+        int ret;
+        int diff = 1;
+        dpl_status_t rc = DPL_FAILURE;
+        char *digest = NULL;
+
+        digest = pentry_get_digest(pe);
+        if (! digest) {
+                LOG(LOG_DEBUG, "no digest");
                 ret = 1;
                 goto err;
         }
@@ -297,15 +322,21 @@ dfs_get_local_copy(pentry_t *pe,
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
+        dpl_ino_t obj_ino;
 
         local = tmpstr_printf("%s/%s", env->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
             ctx->cur_bucket, remote, local);
 
+        if (! remote_file_exists(remote, &obj_ino)) {
+                fd = -1;
+                goto end;
+        }
+
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(pe, (char *)remote))  {
+        if (0 == dfs_md5cmp(pe, (char *)remote, obj_ino))  {
                 fd = pentry_get_fd(pe);
                 goto end;
         }
