@@ -19,7 +19,7 @@ it by yourself.  It relies on the Droplet library, so grab it!
 	$ make
 	$ sudo make install
 
-If the previous lines fail, I suggest you take a look to [3].
+If the previous lines fail, I suggest you take a look at [3].
 
 Then go to the dropletfs-fuse directory, and type:
 
@@ -63,8 +63,9 @@ In some specific cases, we do not want to upload some files on remote
 storage (for example temporary files in scientific computing).  To handle
 this, you can set DROPLETFS_EXCLUSION_PATTERN to a regular expression.
 
-$ export DROPLETFS_EXCLUSION_PATTERN='\.tmp$|\.foo$' to exclude all the
-files ending in .tmp or .foo
+For example, to exclude all the files ending in .tmp or .foo, type:
+
+$ export DROPLETFS_EXCLUSION_PATTERN='\.tmp$|\.foo$'
 
 This feature is *experimental*, we do not recommend using it unless you know
 exactly what you're doing.
