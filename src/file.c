@@ -121,22 +121,30 @@ cb_get_buffered(void *arg,
         return 0;
 }
 
+/* the caller has to free() metadatap */
 static int
-remote_file_exists(const char * const path,
-                   dpl_ino_t *obj_inop)
+download_headers(char * path,
+                 dpl_dict_t **headersp)
 {
+        int ret;
         dpl_status_t rc = DPL_FAILURE;
         dpl_ino_t ino, obj_ino;
         int tries = 0;
         int delay = 1;
-        int ret;
+        dpl_dict_t *dict = NULL;
+
+        if (! headersp) {
+                ret = -1;
+                goto err;
+        }
 
   namei_retry:
-        rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
+        rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
 
         if (DPL_ENOENT == rc) {
-                ret = 0;
-                goto end;
+                LOG(LOG_INFO, "dpl_namei: %s", dpl_status_str(rc));
+                ret = -1;
+                goto err;
         }
 
         if (DPL_SUCCESS != rc) {
@@ -149,37 +157,7 @@ remote_file_exists(const char * const path,
                         goto namei_retry;
                 }
                 LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
-                ret = 0;
-                goto end;
-        }
-
-        ret = 1;
-  end:
-        if (obj_inop)
-                *obj_inop = obj_ino;
-
-        LOG(LOG_DEBUG, "path=%s: does%s exist", path, (0 == ret) ? " not" : "");
-        return ret;
-}
-
-/* compare the MD5 values of a cache file and a remote one.  We suppose the
- * remote file exists */
-static int
-dfs_md5cmp(pentry_t *pe,
-           char *path,
-           dpl_ino_t obj_ino)
-{
-        dpl_dict_t *dict = NULL;
-        char *remote_md5 = NULL;
-        int ret;
-        int diff = 1;
-        dpl_status_t rc = DPL_FAILURE;
-        char *digest = NULL;
-
-        digest = pentry_get_digest(pe);
-        if (! digest) {
-                LOG(LOG_DEBUG, "no digest");
-                ret = 1;
+                ret = -1;
                 goto err;
         }
 
@@ -190,27 +168,44 @@ dfs_md5cmp(pentry_t *pe,
                 goto err;
         }
 
+        *headersp = dict;
+        ret = 0;
+
+  err:
+        return ret;
+}
+
+static int
+dfs_md5cmp(pentry_t *pe,
+           dpl_dict_t *dict)
+{
+        char *remote_md5 = NULL;
+        int ret;
+        char *digest = NULL;
+
+        digest = pentry_get_digest(pe);
+        if (! digest) {
+                LOG(LOG_NOTICE, "no digest");
+                ret = -1;
+                goto err;
+        }
+
         print_metadata(dict);
+        ret = -1;
 
-        if (dict)
-                remote_md5 = dpl_dict_get_value(dict, "etag");
-
+        remote_md5 = dpl_dict_get_value(dict, "etag");
         if (remote_md5) {
                 LOG(LOG_DEBUG, "remote md5=%s", remote_md5);
                 LOG(LOG_DEBUG, "local md5=%.*s", MD5_DIGEST_LENGTH, digest);
-                diff = memcmp(digest, remote_md5, MD5_DIGEST_LENGTH);
-                if (diff) {
+                if (0 == memcmp(digest, remote_md5, MD5_DIGEST_LENGTH)) {
                         pentry_set_digest(pe, remote_md5);
                         LOG(LOG_DEBUG, "updated local md5=%.*s",
-                      MD5_DIGEST_LENGTH, pentry_get_digest(pe));
+                            MD5_DIGEST_LENGTH, pentry_get_digest(pe));
+                        ret = 0;
                 }
         }
 
-        ret = diff;
   err:
-        if (dict)
-                dpl_dict_free(dict);
-
         return ret;
 
 }
@@ -312,6 +307,13 @@ handle_compression(const char *remote,
 }
 
 
+static int
+check_permissions(pentry_t *pe,
+                  dpl_dict_t *metadata)
+{
+        return 0;
+}
+
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(pentry_t *pe,
@@ -319,24 +321,36 @@ dfs_get_local_copy(pentry_t *pe,
 {
         int fd;
         dpl_dict_t *metadata = NULL;
+        dpl_dict_t *headers = NULL;
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
-        dpl_ino_t obj_ino;
 
         local = tmpstr_printf("%s/%s", env->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
             ctx->cur_bucket, remote, local);
 
-        if (! remote_file_exists(remote, &obj_ino)) {
+        if (-1 == download_headers((char *)remote, &headers)) {
+                LOG(LOG_NOTICE, "%s: can't download headers", remote);
                 fd = -1;
+                goto end;
+        }
+
+        if (DPL_FAILURE == dpl_get_metadata_from_headers(headers, metadata)) {
+                LOG(LOG_ERR, "%s: metadata extraction failed", remote);
+                fd = -1;
+                goto end;
+        }
+
+        if (-1 == check_permissions(pe, metadata)) {
+                fd = -EPERM;
                 goto end;
         }
 
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(pe, (char *)remote, obj_ino))  {
+        if (0 == dfs_md5cmp(pe, headers))  {
                 fd = pentry_get_fd(pe);
                 goto end;
         }
@@ -385,6 +399,9 @@ dfs_get_local_copy(pentry_t *pe,
                 pentry_set_metadata(pe, metadata);
                 dpl_dict_free(metadata);
         }
+
+        if (headers)
+                dpl_dict_free(headers);
 
         return fd;
 }
