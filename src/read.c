@@ -27,15 +27,15 @@ dfs_read(const char *path,
         fd = pentry_get_fd(pe);
         if (fd < 0) {
                 LOG(LOG_ERR, "unusable file descriptor fd=%d", fd);
-                ret = EBADF;
+                ret = -EBADFD;
                 goto end;
         }
 
         ret = pread(fd, buf, size, offset);
 
         if (-1 == ret) {
-                LOG(LOG_ERR, "%s (fd=%d) - %s (%d)",
-                    path, fd, strerror(errno), errno);
+                LOG(LOG_ERR, "%s (fd=%d) - %s",
+                    path, fd, strerror(errno));
                 ret = -errno;
                 goto end;
         }
