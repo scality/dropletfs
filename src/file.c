@@ -335,6 +335,13 @@ dfs_get_local_copy(pentry_t *pe,
                 fd = -1;
                 goto end;
         }
+ 
+        metadata = dpl_dict_new(13);
+        if (! metadata) {
+                LOG(LOG_ERR, "dpl_dict_new: can't allocate memory");
+                fd = -1;
+                goto end;
+        }
 
         if (DPL_FAILURE == dpl_get_metadata_from_headers(headers, metadata)) {
                 LOG(LOG_ERR, "%s: metadata extraction failed", remote);
