@@ -101,8 +101,7 @@ dfs_release(const char *path,
         int tries = 0;
         int delay = 1;
 
-        LOG(LOG_DEBUG, "path=%s, %s", path, flag_to_str(info));
-        PRINT_FLAGS(path, info);
+        LOG(LOG_DEBUG, "path=%s, %s", path, flags_to_str(info->flags));
 
         pe = (pentry_t *)info->fh;
         if (! pe) {
@@ -243,9 +242,7 @@ dfs_release(const char *path,
   exc:
         if (pe) {
                 pentry_set_flag(pe, FLAG_CLEAN);
-                LOG(LOG_DEBUG, "unlock(%s) ...", path);
                 (void)pentry_unlock(pe);
-                LOG(LOG_DEBUG, "... %s unlocked!", path);
         }
 
   end:

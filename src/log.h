@@ -15,25 +15,6 @@ extern struct env *env;
         } while (/*CONSTCOND*/0)
 
 
-#define PRINT_FLAGS(path, info)                                         \
-        do {                                                            \
-                switch (info->flags & O_ACCMODE) {                      \
-                case O_RDONLY:                                          \
-                        LOG(LOG_DEBUG, "%s: read only", path);          \
-                        break;                                          \
-                case O_WRONLY:                                          \
-                        LOG(LOG_DEBUG, "%s: write only", path);         \
-                        break;                                          \
-                case O_RDWR:                                            \
-                        LOG(LOG_DEBUG, "%s: read/write", path);         \
-                        break;                                          \
-                default:                                                \
-                        LOG(LOG_DEBUG, "%s: unknown flags 0x%x",        \
-                            path, info->flags & O_ACCMODE);             \
-                }                                                       \
-        } while (/*CONSTCOND*/ 0)
-
-
 
 #endif
 

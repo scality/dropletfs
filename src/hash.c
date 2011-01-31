@@ -8,8 +8,10 @@
 #include "hash.h"
 #include "metadata.h"
 #include "tmpstr.h"
+#include "env.h"
 
 extern GHashTable *hash;
+extern struct env *env;
 
 /* path entry on remote storage file system */
 struct pentry {
@@ -39,6 +41,10 @@ pentry_new(void)
         }
 
         pe->metadata = dpl_dict_new(13);
+        if (! pe->metadata) {
+                LOG(LOG_ERR, "dpl_dict_new: can't allocate memory");
+                goto release;
+        }
 
         rc = sem_init(&pe->refcount, 0, 0);
         if (-1 == rc) {
@@ -186,10 +192,12 @@ pentry_trylock(pentry_t *pe)
 
         assert(pe);
 
+        LOG(LOG_DEBUG, "path=%s: trylock(fd=%d)...", pe->path, pe->fd);
+
         ret = pthread_mutex_trylock(&pe->mutex);
 
-        LOG(LOG_DEBUG, "mutex@%p, path=%s fd=%d: %sacquired",
-            (void *)&pe->mutex, pe->path, pe->fd, ret ? "not " : "");
+        LOG(LOG_DEBUG, "path=%s fd=%d: %sacquired",
+            pe->path, pe->fd, ret ? "not " : "");
 
         return ret;
 }
@@ -201,13 +209,15 @@ pentry_lock(pentry_t *pe)
 
         assert(pe);
 
+        LOG(LOG_DEBUG, "path=%s: lock(fd=%d)...", pe->path, pe->fd);
+
         ret = pthread_mutex_lock(&pe->mutex);
         if (ret)
-                LOG(LOG_ERR, "path=%s, mutex@%p: %s",
-                    pe->path, (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "path=%s, fd=%d: %s",
+                    pe->path, pe->fd, strerror(errno));
         else
-                LOG(LOG_DEBUG, "path=%s; mutex@%p, fd=%d: acquired",
-                    pe->path, (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "path=%s, fd=%d: acquired",
+                    pe->path, pe->fd);
 
 
         return ret;
@@ -220,13 +230,14 @@ pentry_unlock(pentry_t *pe)
 
         assert(pe);
 
+        LOG(LOG_DEBUG, "path=%s, unlock(fd=%d)...", pe->path, pe->fd);
+
         ret = pthread_mutex_unlock(&pe->mutex);
         if (ret)
-                LOG(LOG_ERR, "path=%s, mutex@%p: %s",
-                    pe->path, (void *)&pe->mutex, strerror(errno));
+                LOG(LOG_ERR, "path=%s, fd=%d: %s",
+                    pe->path, pe->fd, strerror(errno));
         else
-                LOG(LOG_DEBUG, "path=%s, mutex@%p, fd=%d: released",
-                    pe->path, (void *)&pe->mutex, pe->fd);
+                LOG(LOG_DEBUG, "path=%s, fd=%d: released", pe->path, pe->fd);
 
         return ret;
 }
@@ -264,17 +275,32 @@ pentry_set_flag(pentry_t *pe, int flag)
         pe->flag = flag;
 }
 
-
 int
 pentry_set_metadata(pentry_t *pe,
-                    dpl_dict_t *meta)
+                    dpl_dict_t *dict)
 {
+        int ret;
+
         assert(pe);
 
-        if (DPL_FAILURE == dpl_dict_copy(pe->metadata, meta))
-                return -1;
+        if (pe->metadata)
+                dpl_dict_free(pe->metadata);
 
-        return 0;
+        pe->metadata = dpl_dict_new(13);
+        if (! pe->metadata) {
+                LOG(LOG_ERR, "dpl_dict_new: can't allocate memory");
+                ret = -1;
+                goto err;
+        }
+
+        if (DPL_FAILURE == dpl_dict_copy(pe->metadata, dict)) {
+                ret = -1;
+                goto err;
+        }
+
+        ret = 0;
+  err:
+        return ret;
 }
 
 dpl_dict_t *

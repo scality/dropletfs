@@ -32,8 +32,7 @@ dfs_create(const char *path,
         int exclude;
 
         LOG(LOG_DEBUG, "%s, mode=0x%x, %s",
-            path, (unsigned)mode, flag_to_str(info));
-        PRINT_FLAGS(path, info);
+            path, (unsigned)mode, flags_to_str(info->flags));
 
         if (! S_ISREG(mode)) {
                 LOG(LOG_ERR, "%s: not a regular file", path);

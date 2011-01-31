@@ -35,11 +35,8 @@ gc_callback(gpointer key,
                 /* open (either r or rw), don't touch this cell */
                 return;
 
-        if (pentry_trylock(pe)) {
-                LOG(LOG_DEBUG, "pentry_trylock(%s): %s (in use)",
-                    path, strerror(errno));
+        if (pentry_trylock(pe))
                 return;
-        }
 
         fd = pentry_get_fd(pe);
         if (-1 == fd)
@@ -85,8 +82,7 @@ gc_callback(gpointer key,
         return;
 
   release:
-        if (pentry_unlock(pe))
-                LOG(LOG_DEBUG, "pentry_unlock(%s): %s", path, strerror(errno));
+        (void)pentry_unlock(pe);
 }
 
 void *

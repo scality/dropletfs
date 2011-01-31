@@ -44,7 +44,6 @@ int pentry_get_fd(pentry_t *);
 
 /* return 0 on success, -1 on failure */
 int pentry_set_metadata(pentry_t *, dpl_dict_t *);
-
 dpl_dict_t *pentry_get_metadata(pentry_t *);
 
 /* return 0 on success, -1 on failure */

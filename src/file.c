@@ -29,9 +29,9 @@ ftype_to_str(dpl_ftype_t type)
 }
 
 char *
-flag_to_str(struct fuse_file_info *info)
+flags_to_str(int flags)
 {
-        switch (info->flags & O_ACCMODE) {
+        switch (flags & O_ACCMODE) {
         case O_RDONLY:
                 return "read only";
         case O_WRONLY:
@@ -317,7 +317,8 @@ check_permissions(pentry_t *pe,
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(pentry_t *pe,
-                   const char * const remote)
+                   const char * const remote,
+                   int flags)
 {
         int fd;
         dpl_dict_t *metadata = NULL;
@@ -335,7 +336,7 @@ dfs_get_local_copy(pentry_t *pe,
                 fd = -1;
                 goto end;
         }
- 
+
         metadata = dpl_dict_new(13);
         if (! metadata) {
                 LOG(LOG_ERR, "dpl_dict_new: can't allocate memory");
@@ -349,8 +350,15 @@ dfs_get_local_copy(pentry_t *pe,
                 goto end;
         }
 
+        if (-1 == pentry_set_metadata(pe, metadata)) {
+                LOG(LOG_ERR, "can't update metadata");
+                fd = -1;
+                goto end;
+        }
+
         if (-1 == check_permissions(pe, metadata)) {
-                fd = -EPERM;
+                LOG(LOG_NOTICE, "permission denied");
+                fd = -1;
                 goto end;
         }
 
@@ -370,7 +378,7 @@ dfs_get_local_copy(pentry_t *pe,
                         LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
         }
 
-        get_data.fd = open(local, O_RDWR|O_CREAT, 0600);
+        get_data.fd = open(local, O_RDWR|O_CREAT|O_TRUNC, 0600);
         if (-1 == get_data.fd) {
                 LOG(LOG_ERR, "open: %s: %s (%d)",
                     local, strerror(errno), errno);
@@ -399,13 +407,24 @@ dfs_get_local_copy(pentry_t *pe,
                 goto end;
         }
 
-        fd = get_data.fd;
+        if (-1 == close(get_data.fd)) {
+                LOG(LOG_ERR, "close(path=%s, fd=%d): %s",
+                    local, get_data.fd, strerror(errno));
+                fd = -1;
+                goto end;
+        }
+
+        fd = open(local, flags, 0600);
+        if (-1 == fd) {
+                LOG(LOG_ERR, "open(path=%s, fd=%d): %s",
+                    local, fd, strerror(errno));
+                fd = -1;
+                goto end;
+        }
 
   end:
-        if (metadata) {
-                pentry_set_metadata(pe, metadata);
+        if (metadata)
                 dpl_dict_free(metadata);
-        }
 
         if (headers)
                 dpl_dict_free(headers);
