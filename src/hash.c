@@ -7,7 +7,7 @@
 #include "log.h"
 #include "hash.h"
 #include "metadata.h"
-
+#include "tmpstr.h"
 
 extern GHashTable *hash;
 
@@ -92,13 +92,17 @@ pentry_free(pentry_t *pe)
 void
 pentry_unlink_cache_file(pentry_t *pe)
 {
+        char *local = NULL;
+
         assert(pe);
 
         if (! pe->path)
                 return;
 
-        if (-1 == unlink(pe->path))
-                LOG(LOG_INFO, "unlink(%s): %s", pe->path, strerror(errno));
+        local = tmpstr_printf("%s/%s", env->cache_dir, pe->path);
+
+        if (-1 == unlink(local))
+                LOG(LOG_INFO, "unlink(%s): %s", local, strerror(errno));
 }
 
 void
