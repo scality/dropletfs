@@ -53,7 +53,7 @@ env_set_cache_dir(struct env *env)
         if (! tmp)
                 tmp = DEFAULT_CACHE_DIR;
 
-        /* remove the trailing spaces */
+        /* remove the trailing slashes */
         p = tmp + strlen(tmp) - 1;
         while (p && *p && '/' == *p) {
                 *p = 0;
@@ -75,7 +75,7 @@ env_set_cache_dir(struct env *env)
                 goto err;
         }
 
-        /* remove the trailing spaces */
+        /* remove the trailing slashes */
         p = env->cache_dir + strlen(env->cache_dir) - 1;
         while (p && *p && '/' == *p) {
                 *p = 0;
@@ -180,11 +180,11 @@ env_set_compression(struct env *env)
 
         if (tmp) {
                 if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
-                        env->compression_method = DEFAULT_COMPRESSION_METHOD;
+                        env->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
                 else
-                        env->compression_method = tmp;
+                        env->compression_method = strdup(tmp);
         } else {
-                env->compression_method = DEFAULT_COMPRESSION_METHOD;
+                env->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
 	}
 
         tmp = getenv("DROPLETFS_ZLIB_LEVEL");
@@ -252,6 +252,13 @@ void
 env_free(struct env *env)
 {
         env_dtor(env);
+
+        if (env->compression_method)
+                free(env->compression_method);
+
+        if (env->cache_dir)
+                free(env->cache_dir);
+
         free(env);
 }
 
