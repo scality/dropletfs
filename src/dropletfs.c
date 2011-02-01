@@ -39,6 +39,8 @@
 #include "chmod.h"
 #include "chown.h"
 
+#include "symlink.h"
+
 #include "env.h"
 #include "gc.h"
 #include "regex.h"
@@ -97,14 +99,6 @@ dfs_readlink(const char *path,
         (void)bufsiz;
 
         LOG(LOG_DEBUG, "%s", path);
-        return 0;
-}
-
-static int
-dfs_symlink(const char *oldpath,
-            const char *newpath)
-{
-        LOG(LOG_DEBUG, "%s -> %s", oldpath, newpath);
         return 0;
 }
 

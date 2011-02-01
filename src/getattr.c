@@ -145,6 +145,7 @@ dfs_getattr(const char *path,
 
         delay = 1;
         tries = 0;
+
  getattr_retry:
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
