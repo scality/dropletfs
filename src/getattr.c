@@ -137,7 +137,7 @@ dfs_getattr(const char *path,
                             path, dpl_status_str(rc));
                         goto namei_retry;
                 }
-                LOG(LOG_ERR, "path=%s, dpl_namei: %s",
+                LOG(LOG_NOTICE, "path=%s, dpl_namei: %s",
                     path, dpl_status_str(rc));
                 ret = rc;
                 goto end;
