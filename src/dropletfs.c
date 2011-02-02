@@ -40,6 +40,7 @@
 #include "chown.h"
 
 #include "symlink.h"
+#include "readlink.h"
 
 #include "env.h"
 #include "gc.h"
@@ -85,18 +86,6 @@ dfs_flush(const char *path,
           struct fuse_file_info *info)
 {
         (void)info;
-
-        LOG(LOG_DEBUG, "%s", path);
-        return 0;
-}
-
-static int
-dfs_readlink(const char *path,
-             char *buf,
-             size_t bufsiz)
-{
-        (void)buf;
-        (void)bufsiz;
 
         LOG(LOG_DEBUG, "%s", path);
         return 0;
