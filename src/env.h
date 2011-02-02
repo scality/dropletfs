@@ -4,6 +4,7 @@
 #include "regex.h"
 
 struct env {
+        char *root_dir; /* the mountpoint */
         char *cache_dir; /* cache directory */
         char *compression_method; /* "zlib" or "none" */
         int zlib_level; /* from 1 to 9 */
@@ -16,7 +17,7 @@ struct env {
 
 
 struct env *env_new(void);
-void env_ctor(struct env *);
+void env_ctor(struct env *, char *);
 void env_dtor(struct env *);
 void env_free(struct env *);
 void env_set_debug(struct env *, int);

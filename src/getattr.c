@@ -70,6 +70,10 @@ dfs_getattr_cached(pentry_t *pe,
                 goto end;
         }
 
+        /* special case for symlinks */
+        if (dpl_dict_get(pentry_get_metadata(pe), "symlink"))
+                st->st_mode |= S_IFLNK;
+
         LOG(LOG_INFO, "path=%s, use the cache fd (%d) to fill struct stat",
             pentry_get_path(pe), fd);
         ret = 0;
@@ -167,6 +171,8 @@ dfs_getattr(const char *path,
 
         set_default_stat(st, type);
         if (metadata) {
+                if (dpl_dict_get(metadata, "symlink"))
+                        st->st_mode |= S_IFLNK;
                 fill_stat_from_metadata(st, metadata);
                 dpl_dict_free(metadata);
         }

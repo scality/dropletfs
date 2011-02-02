@@ -441,7 +441,7 @@ main(int argc,
         droplet_pp(ctx);
 
         env = env_new();
-        env_ctor(env);
+        env_ctor(env, argv[1]);
         env_set_debug(env, debug);
         env_log(env);
 

@@ -92,6 +92,7 @@ read_write_all_vfile(int fd,
 
                 if (0 == r)
                         break;
+
                 rc = dpl_write(vfile, buf, r);
                 if (DPL_SUCCESS != rc) {
                         LOG(LOG_ERR, "dpl_write: %s (%d)",
