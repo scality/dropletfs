@@ -11,6 +11,7 @@
 #include "log.h"
 #include "tmpstr.h"
 #include "regex.h"
+#include "misc.h"
 
 #define DEFAULT_COMPRESSION_METHOD "NONE"
 #define DEFAULT_ZLIB_LEVEL 3
@@ -19,6 +20,7 @@
 #define DEFAULT_GC_LOOP_DELAY 60
 #define DEFAULT_GC_AGE_THRESHOLD 0
 #define DEFAULT_LOG_LEVEL LOG_ERR
+#define DEFAULT_LOG_LEVEL_STR STRIZE(DEFAULT_LOG_LEVEL)
 #define DEFAULT_EXCLUSION_REGEXP NULL
 
 extern struct env *env;
@@ -41,6 +43,47 @@ env_new(void)
         return env;
 }
 
+static void
+env_generic_set_int(int *var,
+                    const char * const id,
+                    int default_value)
+{
+        char *tmp = NULL;
+
+        if (! var)
+                return;
+
+        tmp = getenv(id);
+
+        if (tmp)
+                *var = strtoul(tmp, NULL, 10);
+        else
+                *var = default_value;
+}
+
+static void
+env_generic_set_str(char **var,
+                    const char * const id,
+                    char *default_value)
+{
+        char *tmp = NULL;
+
+        if (! var)
+                return;
+
+        tmp = getenv(id);
+
+        if (tmp)
+                *var = strdup(tmp);
+        else
+                *var = strdup(default_value);
+
+        if (! *var) {
+                perror("strdup");
+                exit(EXIT_FAILURE);
+        }
+}
+
 static int
 env_set_cache_dir(struct env *env)
 {
@@ -49,9 +92,9 @@ env_set_cache_dir(struct env *env)
         char *cache = NULL;
         int ret;
 
-        tmp = getenv("DROPLETFS_CACHE_DIR");
-        if (! tmp)
-                tmp = DEFAULT_CACHE_DIR;
+        env_generic_set_str(&tmp,
+                            "DROPLETFS_CACHE_DIR",
+                            DEFAULT_CACHE_DIR);
 
         /* remove the trailing slashes */
         p = tmp + strlen(tmp) - 1;
@@ -84,33 +127,26 @@ env_set_cache_dir(struct env *env)
 
         ret = 0;
   err:
+        if (tmp)
+                free(tmp);
+
         return ret;
 }
 
 static void
 env_set_gc_loop_delay(struct env *env)
 {
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_GC_LOOP_DELAY");
-
-        if (tmp)
-                env->gc_loop_delay = strtoul(tmp, NULL, 10);
-        else
-                env->gc_loop_delay = DEFAULT_GC_LOOP_DELAY;
+        env_generic_set_int(&env->gc_loop_delay,
+                            "DROPLETFS_GC_LOOP_DELAY",
+                            DEFAULT_GC_LOOP_DELAY);
 }
 
 static void
 env_set_gc_age_threshold(struct env *env)
 {
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_GC_AGE_THRESHOLD");
-
-        if (tmp)
-                env->gc_age_threshold = strtoul(tmp, NULL, 10);
-        else
-                env->gc_age_threshold = DEFAULT_GC_AGE_THRESHOLD;
+        env_generic_set_int(&env->gc_age_threshold,
+                            "DROPLETFS_GC_AGE_THRESHOLD",
+                            DEFAULT_GC_AGE_THRESHOLD);
 }
 
 static char *
@@ -156,12 +192,11 @@ env_set_log_level(struct env *env)
 {
         char *tmp = NULL;
 
-        tmp = getenv("DROPLETFS_LOG_LEVEL");
+        env_generic_set_str(&tmp,
+                            "DROPLETFS_LOG_LEVEL",
+                            DEFAULT_LOG_LEVEL_STR);
 
-        if (tmp)
-                env->log_level = str_to_log_level(tmp);
-        else
-                env->log_level = DEFAULT_LOG_LEVEL;
+        env->log_level = str_to_log_level(tmp);
 
         if (env->log_level > LOG_DEBUG || env->log_level < LOG_EMERG) {
                 fprintf(stderr, "invalid debug level (%d), set to %d",
@@ -169,42 +204,43 @@ env_set_log_level(struct env *env)
                 env->log_level = DEFAULT_LOG_LEVEL;
         }
 
+        if (tmp)
+                free(tmp);
+
 }
 
 static void
-env_set_compression(struct env *env)
+env_set_compression_method(struct env *env)
 {
-        char *tmp = NULL;
+        env_generic_set_str(&env->compression_method,
+                            "DROPLETFS_COMPRESSION_METHOD",
+                            DEFAULT_COMPRESSION_METHOD);
 
-        tmp = getenv("DROPLETFS_COMPRESSION_METHOD");
-
-        if (tmp) {
-                if (0 != strncasecmp(tmp, "zlib", strlen("zlib")))
-                        env->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
-                else
-                        env->compression_method = strdup(tmp);
-        } else {
+        if (strcasecmp(env->compression_method, "zlib") &&
+            strcasecmp(env->compression_method, "none")) {
+                free(env->compression_method);
                 env->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
-	}
+                if (! env->compression_method) {
+                        perror("strdup");
+                        exit(EXIT_FAILURE);
+                }
+        }
+}
 
-        tmp = getenv("DROPLETFS_ZLIB_LEVEL");
-
-        if (tmp)
-                env->zlib_level = strtoul(tmp, NULL, 10);
-        else
-                env->zlib_level = DEFAULT_ZLIB_LEVEL;
+static void
+env_set_compression_level(struct env *env)
+{
+        env_generic_set_int(&env->zlib_level,
+                            "DROPLETFS_ZLIB_LEVEL",
+                            DEFAULT_ZLIB_LEVEL);
 }
 
 static void
 env_set_max_retry(struct env *env)
 {
-        char *tmp = NULL;
-
-        tmp = getenv("DROPLETFS_MAX_RETRY");
-
-        env->max_retry = DEFAULT_MAX_RETRY;
-        if (tmp)
-                env->max_retry = strtoul(tmp, NULL, 10);
+        env_generic_set_int(&env->max_retry,
+                            "DROPLETFS_MAX_RETRY",
+                            DEFAULT_MAX_RETRY);
 }
 
 static void
@@ -229,7 +265,8 @@ void
 env_ctor(struct env *env)
 {
         env_set_log_level(env);
-        env_set_compression(env);
+        env_set_compression_method(env);
+        env_set_compression_level(env);
         env_set_max_retry(env);
         env_set_gc_loop_delay(env);
         env_set_gc_age_threshold(env);
