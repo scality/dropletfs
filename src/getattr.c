@@ -5,7 +5,6 @@
 #include <time.h>
 
 #include "getattr.h"
-#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "metadata.h"

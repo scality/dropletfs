@@ -4,7 +4,6 @@
 
 #include "open.h"
 #include "create.h"
-#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "metadata.h"

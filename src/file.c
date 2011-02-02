@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "env.h"
 #include "log.h"
 #include "file.h"
 #include "tmpstr.h"

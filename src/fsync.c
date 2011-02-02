@@ -5,7 +5,6 @@
 #include "fsync.h"
 #include "hash.h"
 #include "log.h"
-#include "env.h"
 
 extern GHashTable *hash;
 

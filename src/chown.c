@@ -1,6 +1,5 @@
 #include <droplet.h>
 
-#include "env.h"
 #include "chown.h"
 #include "log.h"
 #include "metadata.h"

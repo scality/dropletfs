@@ -42,7 +42,6 @@
 #include "symlink.h"
 #include "readlink.h"
 
-#include "env.h"
 #include "gc.h"
 #include "regex.h"
 

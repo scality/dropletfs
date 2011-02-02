@@ -8,7 +8,6 @@
 #include "glob.h"
 #include "file.h"
 #include "tmpstr.h"
-#include "env.h"
 
 extern GHashTable *hash;
 extern struct env *env;
