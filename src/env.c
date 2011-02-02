@@ -84,6 +84,30 @@ env_generic_set_str(char **var,
         }
 }
 
+static void
+env_set_root_dir(struct env *env,
+                 char *root_dir)
+{
+        char *p = NULL;
+
+        if (! root_dir)
+                return;
+
+        if (env->root_dir)
+                free(env->root_dir);
+
+        /* remove the trailing slashes */
+        p = root_dir + strlen(root_dir) - 1;
+        while (p && *p && '/' == *p)
+                *p-- = 0;
+
+        env->root_dir = strdup(root_dir);
+        if (! env->root_dir) {
+                perror("strdup");
+                exit(EXIT_FAILURE);
+        }
+}
+
 static int
 env_set_cache_dir(struct env *env)
 {
@@ -262,7 +286,8 @@ env_set_debug(struct env *env,
 }
 
 void
-env_ctor(struct env *env)
+env_ctor(struct env *env,
+         char *root_dir)
 {
         env_set_log_level(env);
         env_set_compression_method(env);
@@ -271,6 +296,7 @@ env_ctor(struct env *env)
         env_set_gc_loop_delay(env);
         env_set_gc_age_threshold(env);
         env_set_exclusion_pattern(env);
+        env_set_root_dir(env, root_dir);
 
         if (-1 == env_set_cache_dir(env)) {
                 fprintf(stderr, "can't create any cache directory");

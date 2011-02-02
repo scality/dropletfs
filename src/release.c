@@ -193,8 +193,7 @@ dfs_release(const char *path,
         if (DPL_SUCCESS != rc) {
                 if (rc != DPL_ENOENT && (tries < env->max_retry)) {
                         LOG(LOG_NOTICE,
-                            "dpl_openwrite timeout? (delay=%d, vfile@%p)",
-                            delay, (void *)vfile);
+                            "dpl_openwrite timeout? (delay=%d)", delay);
                         tries++;
                         sleep(delay);
                         delay *= 2;

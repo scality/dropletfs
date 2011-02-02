@@ -47,6 +47,7 @@ dfs_getattr_cached(pentry_t *pe,
         int ret;
         int fd;
         int exclude;
+        dpl_dict_t *dict = NULL;
 
         exclude = pentry_get_exclude(pe);
         fd = pentry_get_fd(pe);
@@ -69,6 +70,11 @@ dfs_getattr_cached(pentry_t *pe,
                 ret = -1;
                 goto end;
         }
+
+        /* special case for symlinks */
+        dict = pentry_get_metadata(pe);
+        if (dict && dpl_dict_get(dict, "symlink"))
+                st->st_mode |= S_IFLNK;
 
         LOG(LOG_INFO, "path=%s, use the cache fd (%d) to fill struct stat",
             pentry_get_path(pe), fd);
@@ -145,6 +151,7 @@ dfs_getattr(const char *path,
 
         delay = 1;
         tries = 0;
+
  getattr_retry:
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
@@ -166,6 +173,8 @@ dfs_getattr(const char *path,
 
         set_default_stat(st, type);
         if (metadata) {
+                if (dpl_dict_get(metadata, "symlink"))
+                        st->st_mode |= S_IFLNK;
                 fill_stat_from_metadata(st, metadata);
                 dpl_dict_free(metadata);
         }

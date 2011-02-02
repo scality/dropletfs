@@ -39,6 +39,9 @@
 #include "chmod.h"
 #include "chown.h"
 
+#include "symlink.h"
+#include "readlink.h"
+
 #include "env.h"
 #include "gc.h"
 #include "regex.h"
@@ -85,26 +88,6 @@ dfs_flush(const char *path,
         (void)info;
 
         LOG(LOG_DEBUG, "%s", path);
-        return 0;
-}
-
-static int
-dfs_readlink(const char *path,
-             char *buf,
-             size_t bufsiz)
-{
-        (void)buf;
-        (void)bufsiz;
-
-        LOG(LOG_DEBUG, "%s", path);
-        return 0;
-}
-
-static int
-dfs_symlink(const char *oldpath,
-            const char *newpath)
-{
-        LOG(LOG_DEBUG, "%s -> %s", oldpath, newpath);
         return 0;
 }
 
@@ -439,7 +422,7 @@ main(int argc,
         droplet_pp(ctx);
 
         env = env_new();
-        env_ctor(env);
+        env_ctor(env, argv[1]);
         env_set_debug(env, debug);
         env_log(env);
 
