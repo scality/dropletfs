@@ -384,8 +384,7 @@ droplet_pp(dpl_ctx_t *ctx)
 static void
 usage(const char * const prog)
 {
-        printf("Usage: %s <bucket> [-d] [-x pattern] <mountpoint> [options]\n",
-               prog);
+        printf("Usage: %s <bucket> [-d] <mountpoint> [options]\n", prog);
         printf("\t<bucket>\tthe name of your remote bucket\n");
         printf("\t-d\t\tset the debug mode. Information are written in syslog\n");
         printf("\t<mountpoint>\tthe directory you want to use as mount point.\n");
@@ -401,7 +400,6 @@ main(int argc,
         char *bucket = NULL;
         dpl_status_t rc = DPL_FAILURE;
         int debug = 0;
-        char *exclusion_pattern = NULL;
 
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
 
@@ -418,12 +416,6 @@ main(int argc,
                 debug = 1;
                 argc--;
                 argv++;
-        }
-
-        if (0 == strncmp(argv[0], "-x", 2)) {
-                argc--;
-                argv++;
-                exclusion_pattern = strdup(argv[0]);
         }
 
 	rc = dpl_init();
