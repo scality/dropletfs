@@ -47,6 +47,7 @@ dfs_getattr_cached(pentry_t *pe,
         int ret;
         int fd;
         int exclude;
+        dpl_dict_t *dict = NULL;
 
         exclude = pentry_get_exclude(pe);
         fd = pentry_get_fd(pe);
@@ -71,7 +72,8 @@ dfs_getattr_cached(pentry_t *pe,
         }
 
         /* special case for symlinks */
-        if (dpl_dict_get(pentry_get_metadata(pe), "symlink"))
+        dict = pentry_get_metadata(pe);
+        if (dict && dpl_dict_get(dict, "symlink"))
                 st->st_mode |= S_IFLNK;
 
         LOG(LOG_INFO, "path=%s, use the cache fd (%d) to fill struct stat",
