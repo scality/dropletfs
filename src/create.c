@@ -10,7 +10,7 @@
 #include "hash.h"
 #include "regex.h"
 
-extern struct env *env;
+extern struct conf *conf;
 extern dpl_ctx_t *ctx;
 
 int
@@ -39,7 +39,7 @@ dfs_create(const char *path,
                 goto err;
         }
 
-        exclude = re_match(&env->regex, path);
+        exclude = re_match(&conf->regex, path);
 
         if (! exclude) {
                 ino = dpl_cwd(ctx, ctx->cur_bucket);
@@ -52,7 +52,7 @@ dfs_create(const char *path,
                     path, ino.key, parent.key, obj.key, ftype_to_str(type));
 
                 if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
-                        if (tries < env->max_retry) {
+                        if (tries < conf->max_retry) {
                                 tries++;
                                 sleep(delay);
                                 delay *= 2;
@@ -109,7 +109,7 @@ dfs_create(const char *path,
                 rc = dpl_mknod(ctx, (char *)path);
 
                 if (DPL_SUCCESS != rc) {
-                        if ((tries < env->max_retry)) {
+                        if ((tries < conf->max_retry)) {
                                 LOG(LOG_NOTICE, "mknod: timeout? (%s)",
                                     dpl_status_str(rc));
                                 tries++;

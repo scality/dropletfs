@@ -45,7 +45,9 @@ re_ctor(struct re *re,
 
 void re_dtor(struct re *re)
 {
-        free(re->str);
+        if (re->str)
+                free(re->str);
+
         regfree(&re->rx);
 }
 

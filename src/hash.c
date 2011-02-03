@@ -10,7 +10,7 @@
 #include "tmpstr.h"
 
 extern GHashTable *hash;
-extern struct env *env;
+extern struct conf *conf;
 
 /* path entry on remote storage file system */
 struct pentry {
@@ -104,7 +104,7 @@ pentry_unlink_cache_file(pentry_t *pe)
         if (! pe->path)
                 return;
 
-        local = tmpstr_printf("%s/%s", env->cache_dir, pe->path);
+        local = tmpstr_printf("%s/%s", conf->cache_dir, pe->path);
 
         if (-1 == unlink(local))
                 LOG(LOG_INFO, "unlink(%s): %s", local, strerror(errno));

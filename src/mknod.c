@@ -4,7 +4,7 @@
 #include "log.h"
 
 extern dpl_ctx_t *ctx;
-extern struct env *env;
+extern struct conf *conf;
 
 int
 dfs_mknod(const char *path,
@@ -21,7 +21,7 @@ dfs_mknod(const char *path,
         rc = dpl_mknod(ctx, (char *)path);
 
         if (DPL_SUCCESS != rc) {
-                if (tries < env->max_retry) {
+                if (tries < conf->max_retry) {
                         LOG(LOG_NOTICE, "mknod: timeout? (%s)",
                             dpl_status_str(rc));
                         tries++;

@@ -10,7 +10,7 @@
 #include "tmpstr.h"
 
 extern GHashTable *hash;
-extern struct env *env;
+extern struct conf *conf;
 
 enum state_mode {
         MODE_RDONLY,
@@ -79,7 +79,7 @@ build_cache_tree(const char *path)
         while (path && '/' == *path)
                 path++;
 
-        local = tmpstr_printf("%s/%s", env->cache_dir, path);
+        local = tmpstr_printf("%s/%s", conf->cache_dir, path);
 
         tmp_local = strdup(local);
 

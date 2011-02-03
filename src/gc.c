@@ -11,7 +11,7 @@
 #include "hash.h"
 #include "gc.h"
 
-extern struct env *env;
+extern struct conf *conf;
 
 static void
 gc_callback(gpointer key,
@@ -26,7 +26,7 @@ gc_callback(gpointer key,
         time_t t;
         char *local = NULL;
         int refcount = 0;
-        int threshold = env->gc_age_threshold;
+        int threshold = conf->gc_age_threshold;
 
         assert(pe);
 
@@ -70,7 +70,7 @@ gc_callback(gpointer key,
             path, (int)t, (int)st.st_atime, (int)st.st_mtime, (int)st.st_ctime);
 
   remove:
-        local = tmpstr_printf("%s/%s", env->cache_dir, path);
+        local = tmpstr_printf("%s/%s", conf->cache_dir, path);
         LOG(LOG_INFO, "removing cache file '%s'", local);
         if (-1 == unlink(local))
                 LOG(LOG_ERR, "unlink(%s): %s", local, strerror(errno));
@@ -92,9 +92,9 @@ thread_gc(void *cb_arg)
 
         LOG(LOG_DEBUG, "entering thread");
 
-        if (env->gc_loop_delay && env->gc_age_threshold) {
+        if (conf->gc_loop_delay && conf->gc_age_threshold) {
                 while (1) {
-                        sleep(env->gc_loop_delay);
+                        sleep(conf->gc_loop_delay);
                         g_hash_table_foreach(hash, gc_callback, hash);
                 }
         }

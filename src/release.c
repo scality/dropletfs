@@ -9,7 +9,7 @@
 #include "zip.h"
 
 extern dpl_ctx_t *ctx;
-extern struct env *env;
+extern struct conf *conf;
 
 /*
  * compress a file,  set `size' to the resulting file size
@@ -32,7 +32,7 @@ compress_before_sending(FILE *fpsrc,
         int zrc;
 
         LOG(LOG_INFO, "start compression before upload");
-        zrc = zip(fpsrc, fpdst, env->zlib_level);
+        zrc = zip(fpsrc, fpdst, conf->zlib_level);
         if (Z_OK != zrc) {
                 LOG(LOG_ERR, "zip failed: %s", zerr_to_str(zrc));
                 ret = 0;
@@ -145,9 +145,9 @@ dfs_release(const char *path,
         fill_metadata_from_stat(dict, &st);
         fd_tosend = fd;
 
-        local = tmpstr_printf("%s/%s", env->cache_dir, path);
+        local = tmpstr_printf("%s/%s", conf->cache_dir, path);
 
-        if (0 == strncasecmp(env->compression_method, "zlib", strlen("zlib"))) {
+        if (0 == strncasecmp(conf->compression_method, "zlib", strlen("zlib"))) {
                 zlocal = tmpstr_printf("%s.tmp", local);
 
                 fpsrc = fopen(local, "r");
@@ -191,7 +191,7 @@ dfs_release(const char *path,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
-                if (rc != DPL_ENOENT && (tries < env->max_retry)) {
+                if (rc != DPL_ENOENT && (tries < conf->max_retry)) {
                         LOG(LOG_NOTICE,
                             "dpl_openwrite timeout? (delay=%d)", delay);
                         tries++;

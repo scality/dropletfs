@@ -12,7 +12,7 @@
 
 #define WRITE_BLOCK_SIZE (1000*1000)
 
-extern struct env *env;
+extern struct conf *conf;
 extern dpl_ctx_t *ctx;
 
 char *
@@ -148,7 +148,7 @@ download_headers(char * path,
         }
 
         if (DPL_SUCCESS != rc) {
-                if (tries < env->max_retry) {
+                if (tries < conf->max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
@@ -327,7 +327,7 @@ dfs_get_local_copy(pentry_t *pe,
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
 
-        local = tmpstr_printf("%s/%s", env->cache_dir, remote);
+        local = tmpstr_printf("%s/%s", conf->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
             ctx->cur_bucket, remote, local);
 

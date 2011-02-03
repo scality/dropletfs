@@ -22,13 +22,13 @@ dfs_symlink(const char *oldpath,
         char *opath = NULL;
         char *size_str = NULL;
 
-        LOG(LOG_DEBUG, "%s -> %s, rootdir = %s", oldpath, newpath, env->root_dir);
+        LOG(LOG_DEBUG, "%s -> %s, rootdir = %s", oldpath, newpath, conf->root_dir);
 
  retry:
         rc = dpl_mknod(ctx, (char *)newpath);
 
         if (DPL_SUCCESS != rc) {
-                if (tries < env->max_retry) {
+                if (tries < conf->max_retry) {
                         LOG(LOG_NOTICE, "mknod: timeout? (%s)",
                             dpl_status_str(rc));
                         tries++;
@@ -41,9 +41,9 @@ dfs_symlink(const char *oldpath,
                 goto err;
         }
 
-        opath = strstr(oldpath, env->root_dir);
+        opath = strstr(oldpath, conf->root_dir);
         if (opath)
-                opath += strlen(env->root_dir) + 1;
+                opath += strlen(conf->root_dir) + 1;
         else
                 opath = (char *)oldpath;
 

@@ -10,7 +10,7 @@
 #include "metadata.h"
 
 extern dpl_ctx_t *ctx;
-extern struct env *env;
+extern struct conf *conf;
 extern GHashTable *hash;
 
 static void
@@ -134,7 +134,7 @@ dfs_getattr(const char *path,
             parent_ino.key, obj_ino.key);
 
         if (DPL_SUCCESS != rc) {
-                if (DPL_ENOENT != rc && (tries < env->max_retry)) {
+                if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         tries++;
                         sleep(delay);
                         delay *= 2;
@@ -155,7 +155,7 @@ dfs_getattr(const char *path,
         rc = dpl_getattr(ctx, (char *)path, &metadata);
 
         if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                if (tries < env->max_retry) {
+                if (tries < conf->max_retry) {
                         tries++;
                         sleep(delay);
                         delay *= 2;

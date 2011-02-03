@@ -44,12 +44,14 @@
 
 #include "gc.h"
 #include "regex.h"
+#include "conf.h"
+#include "env.h"
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
 mode_t root_mode = 0;
 GHashTable *hash = NULL;
-struct env *env = NULL;
+struct conf *conf = NULL;
 
 
 /* Not implemented yet */
@@ -175,9 +177,9 @@ dfs_destroy(void *arg)
                 g_hash_table_remove_all(hash);
         }
 
-        if (env) {
-                LOG(LOG_DEBUG, "releasing environment memory");
-                env_free(env);
+        if (conf) {
+                LOG(LOG_DEBUG, "releasing config memory");
+                conf_free(conf);
         }
 
         LOG(LOG_DEBUG, "freeing libdroplet context");
@@ -420,10 +422,9 @@ main(int argc,
 
         droplet_pp(ctx);
 
-        env = env_new();
-        env_ctor(env, argv[1]);
-        env_set_debug(env, debug);
-        env_log(env);
+        conf = conf_new();
+        conf_ctor(conf, argv[1], debug);
+        conf_log(conf);
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
         rc = dfs_fuse_main(&args);

@@ -3,13 +3,13 @@
 
 #include <syslog.h>
 
-#include "env.h"
+#include "conf.h"
 
-extern struct env *env;
+extern struct conf *conf;
 
 #define LOG(priority, fmt, ...)                                         \
         do {                                                            \
-                if (priority > env->log_level) break;                   \
+                if (priority > conf->log_level) break;                  \
                 syslog(priority, "%s:%s():%d -- " fmt "",               \
                        __FILE__, __func__, __LINE__, ##__VA_ARGS__);    \
         } while (/*CONSTCOND*/0)

@@ -5,7 +5,6 @@
 #include "metadata.h"
 
 extern dpl_ctx_t *ctx;
-extern struct env *env;
 
 int
 dfs_chmod(const char *path,
