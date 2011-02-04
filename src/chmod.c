@@ -27,7 +27,7 @@ dfs_chmod(const char *path,
         if (! metadata)
                 metadata = dpl_dict_new(13);
 
-        assign_meta_to_dict(metadata, "mode", &mode);
+        assign_meta_to_dict(metadata, "mode", (unsigned long)mode);
 
         rc = dfs_setattr_timeout(ctx, path, metadata);
         if (DPL_SUCCESS != rc) {

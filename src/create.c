@@ -88,7 +88,7 @@ dfs_create(const char *path,
         }
 
         fill_metadata_from_stat(meta, &st);
-        assign_meta_to_dict(meta, "mode", &mode);
+        assign_meta_to_dict(meta, "mode", (unsigned long)mode);
 
         if (! exclude) {
                 rc = dfs_mknod_timeout(ctx, path);

@@ -23,39 +23,27 @@ print_metadata(dpl_dict_t *dict)
 void
 assign_meta_to_dict(dpl_dict_t *dict,
                     char *meta,
-                    void *v)
+                    unsigned long val)
 {
-        unsigned long val = 0;
-        unsigned long size = 0;
-        dpl_var_t *var = NULL;
         char *buf = NULL;
-
-        val = *(unsigned long*)v;
-
-        if (NULL != (var = dpl_dict_get(dict, meta))) {
-                if (!strcmp("size", meta)) {
-                        size = strtoul(var->value, NULL, 10);
-                        val += size;
-                }
-                dpl_dict_remove(dict, var);
-        }
+        LOG(LOG_DEBUG, "meta='%s', value='%s'", meta, buf);
 
         buf = tmpstr_printf("%lu", val);
-        LOG(LOG_DEBUG, "meta='%s', value='%s'", meta, buf);
-        dpl_dict_add(dict, meta, buf, 0);
+        if (DPL_SUCCESS != dpl_dict_update_value(dict, meta, buf))
+                LOG(LOG_ERR, "can't update value '%s' for '%s'", buf, meta);
 }
 
 void
 fill_metadata_from_stat(dpl_dict_t *dict,
                         struct stat *st)
 {
-        assign_meta_to_dict(dict, "mode", &st->st_mode);
-        assign_meta_to_dict(dict, "size", &st->st_size);
-        assign_meta_to_dict(dict, "uid", &st->st_uid);
-        assign_meta_to_dict(dict, "gid", &st->st_gid);
-        assign_meta_to_dict(dict, "atime", &st->st_atime);
-        assign_meta_to_dict(dict, "mtime", &st->st_mtime);
-        assign_meta_to_dict(dict, "ctime", &st->st_ctime);
+        assign_meta_to_dict(dict, "mode", (unsigned long)st->st_mode);
+        assign_meta_to_dict(dict, "size", (unsigned long)st->st_size);
+        assign_meta_to_dict(dict, "uid", (unsigned long)st->st_uid);
+        assign_meta_to_dict(dict, "gid", (unsigned long)st->st_gid);
+        assign_meta_to_dict(dict, "atime", (unsigned long)st->st_atime);
+        assign_meta_to_dict(dict, "mtime", (unsigned long)st->st_mtime);
+        assign_meta_to_dict(dict, "ctime", (unsigned long)st->st_ctime);
 }
 
 void
@@ -64,12 +52,12 @@ fill_default_metadata(dpl_dict_t *dict)
         time_t t;
 
         t = time(NULL);
-        assign_meta_to_dict(dict, "mode", (mode_t []){umask(S_IWGRP|S_IWOTH)});
-        assign_meta_to_dict(dict, "uid", (uid_t []){getuid()});
-        assign_meta_to_dict(dict, "gid", (gid_t []){getgid()});
-        assign_meta_to_dict(dict, "atime", &t);
-        assign_meta_to_dict(dict, "ctime", &t);
-        assign_meta_to_dict(dict, "mtime", &t);
+        assign_meta_to_dict(dict, "mode", (unsigned long)umask(S_IWGRP|S_IWOTH));
+        assign_meta_to_dict(dict, "uid", (unsigned long)getuid());
+        assign_meta_to_dict(dict, "gid", (unsigned long)getgid());
+        assign_meta_to_dict(dict, "atime", (unsigned long)t);
+        assign_meta_to_dict(dict, "ctime", (unsigned long)t);
+        assign_meta_to_dict(dict, "mtime", (unsigned long)t);
 
 }
 
