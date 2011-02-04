@@ -73,30 +73,6 @@ env_generic_set_str(char **var,
         return ret;
 }
 
-static int
-env_set_cache_dir(struct conf *conf)
-{
-        char *tmp = NULL;
-        int ret;
-
-        if (-1 == env_generic_set_str(&tmp, "DROPLETFS_CACHE_DIR")) {
-                ret = 0;
-                goto err;
-        }
-
-        if (-1 == conf_set_full_cache_dir(conf)) {
-                ret = -1;
-                goto err;
-        }
-
-        ret = 0;
-  err:
-        if (tmp)
-                free(tmp);
-
-        return ret;
-}
-
 static void
 env_set_gc_loop_delay(struct conf *conf)
 {
@@ -152,9 +128,4 @@ env_override_conf(struct conf *conf)
         env_set_gc_loop_delay(conf);
         env_set_gc_age_threshold(conf);
         env_set_exclusion_pattern(conf);
-
-        if (-1 == env_set_cache_dir(conf)) {
-                fprintf(stderr, "can't create any cache directory\n");
-                exit(EXIT_FAILURE);
-        }
 }

@@ -21,7 +21,6 @@ int conf_ctor(struct conf *, char *, int);
 void conf_dtor(struct conf *);
 void conf_free(struct conf *);
 void conf_log(struct conf *);
-int conf_set_full_cache_dir(struct conf *);
 
 
 #endif /* CONF_H */

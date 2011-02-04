@@ -155,7 +155,7 @@ conf_set_root_dir(struct conf *conf,
         }
 }
 
-int
+static int
 conf_set_full_cache_dir(struct conf *conf)
 {
         char *p = NULL;
@@ -203,7 +203,6 @@ parse_int(int *field,
 {
         int ret;
         char *p = NULL;
-
 
         /* remove leading garbage */
         p = strchr(line, '=');
@@ -307,7 +306,7 @@ parse_token(struct conf * conf,
         }
 
         if (! strncasecmp(token, CACHE_DIR, CACHE_DIR_LEN)) {
-                if (-1 == parse_str(&conf->cache_dir, "cache_dir")) {
+                if (-1 == parse_str(&conf->cache_dir, token)) {
                         ret = -1;
                         goto err;
                 }
