@@ -9,6 +9,7 @@
 #include "tmpstr.h"
 #include "metadata.h"
 #include "zip.h"
+#include "timeout.h"
 
 #define WRITE_BLOCK_SIZE (1000*1000)
 
@@ -127,10 +128,8 @@ download_headers(char * path,
                  dpl_dict_t **headersp)
 {
         int ret;
-        dpl_status_t rc = DPL_FAILURE;
+        dpl_status_t rc;
         dpl_ino_t ino, obj_ino;
-        int tries = 0;
-        int delay = 1;
         dpl_dict_t *dict = NULL;
 
         if (! headersp) {
@@ -138,32 +137,24 @@ download_headers(char * path,
                 goto err;
         }
 
-  namei_retry:
-        rc = dpl_namei(ctx, path, ctx->cur_bucket, ino, NULL, &obj_ino, NULL);
-
-        if (DPL_ENOENT == rc) {
-                LOG(LOG_INFO, "dpl_namei: %s", dpl_status_str(rc));
+        rc = dfs_namei_timeout(ctx, path, ctx->cur_bucket,
+                               ino, NULL, &obj_ino, NULL);
+        if (DPL_ENOENT == rc ) {
+                LOG(LOG_INFO, "dfs_namei_timeout: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
 
         if (DPL_SUCCESS != rc) {
-                if (tries < conf->max_retry) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "namei timeout? (%s)",
-                            dpl_status_str(rc));
-                        goto namei_retry;
-                }
-                LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dfs_namei_timeout: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
 
-        rc = dpl_head_all(ctx, ctx->cur_bucket, obj_ino.key, NULL, NULL, &dict);
+        rc = dfs_head_all_timeout(ctx, ctx->cur_bucket, obj_ino.key,
+                                  NULL, NULL, &dict);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dpl_head_all: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_head_all_timeout: %s", dpl_status_str(rc));
                 ret = 1;
                 goto err;
         }

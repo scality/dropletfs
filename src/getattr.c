@@ -8,6 +8,7 @@
 #include "log.h"
 #include "file.h"
 #include "metadata.h"
+#include "timeout.h"
 
 extern dpl_ctx_t *ctx;
 extern struct conf *conf;
@@ -92,8 +93,6 @@ dfs_getattr(const char *path,
         dpl_dict_t *metadata = NULL;
         pentry_t *pe = NULL;
         int ret;
-        int tries = 0;
-        int delay = 1;
 
         LOG(LOG_DEBUG, "path=%s, st=%p", path, (void *)st);
 
@@ -125,45 +124,27 @@ dfs_getattr(const char *path,
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
- namei_retry:
-        rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                       ino, &parent_ino, &obj_ino, &type);
+        rc = dfs_namei_timeout(ctx, path, ctx->cur_bucket,
+                               ino, &parent_ino, &obj_ino, &type);
 
         LOG(LOG_DEBUG, "path=%s, dpl_namei: %s, type=%s, parent_ino=%s, obj_ino=%s",
             path, dpl_status_str(rc), ftype_to_str(type),
             parent_ino.key, obj_ino.key);
 
-        if (DPL_SUCCESS != rc) {
-                if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "path=%s, namei timeout? (%s)",
-                            path, dpl_status_str(rc));
-                        goto namei_retry;
-                }
-                LOG(LOG_NOTICE, "path=%s, dpl_namei: %s",
-                    path, dpl_status_str(rc));
+        if (DPL_ENOENT == rc) {
                 ret = rc;
                 goto end;
         }
 
-        delay = 1;
-        tries = 0;
+        if (DPL_SUCCESS != rc) {
+                LOG(LOG_NOTICE, "dfs_namei_timeout: %s", dpl_status_str(rc));
+                ret = rc;
+                goto end;
+        }
 
- getattr_retry:
-        rc = dpl_getattr(ctx, (char *)path, &metadata);
-
-        if (DPL_SUCCESS != rc && (DPL_EISDIR != rc)) {
-                if (tries < conf->max_retry) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "path=%s, getattr timeout? (%s)",
-                            path, dpl_status_str(rc));
-                        goto getattr_retry;
-                }
-                LOG(LOG_ERR, "dpl_getattr: %s", dpl_status_str(rc));
+        rc = dfs_getattr_timeout(ctx, path, &metadata);
+        if (DPL_SUCCESS != rc && DPL_EISDIR != rc && DPL_ENOENT != rc) {
+                LOG(LOG_ERR, "dfs_getattr_timeout: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);
                 ret = -1;

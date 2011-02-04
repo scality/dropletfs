@@ -4,6 +4,7 @@
 
 #include "readlink.h"
 #include "log.h"
+#include "timeout.h"
 
 extern dpl_ctx_t *ctx;
 
@@ -18,7 +19,12 @@ dfs_readlink(const char *path,
         char *dest = NULL;
         size_t dest_size = 0;
 
-        rc = dpl_getattr(ctx, (char *)path, &dict);
+        rc = dfs_getattr_timeout(ctx, path, &dict);
+        if (DPL_SUCCESS != rc) {
+                LOG(LOG_ERR, "dfs_getattr_timeout: %s", dpl_status_str(rc));
+                ret = -1;
+                goto err;
+        }
 
         if (! dict) {
                 LOG(LOG_ERR, "dpl_getattr: %s", dpl_status_str(rc));

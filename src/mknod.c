@@ -2,9 +2,9 @@
 
 #include "mknod.h"
 #include "log.h"
+#include "timeout.h"
 
 extern dpl_ctx_t *ctx;
-extern struct conf *conf;
 
 int
 dfs_mknod(const char *path,
@@ -12,26 +12,18 @@ dfs_mknod(const char *path,
           dev_t dev)
 {
         dpl_status_t rc = DPL_FAILURE;
-        int tries = 0;
-        int delay = 1;
+        int ret;
 
         LOG(LOG_DEBUG, "%s, mode=0x%X", path, (unsigned)mode);
 
- retry:
-        rc = dpl_mknod(ctx, (char *)path);
-
+        rc = dfs_mknod_timeout(ctx, path);
         if (DPL_SUCCESS != rc) {
-                if (tries < conf->max_retry) {
-                        LOG(LOG_NOTICE, "mknod: timeout? (%s)",
-                            dpl_status_str(rc));
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        goto retry;
-                }
-                LOG(LOG_ERR, "dpl_mknod: %s", dpl_status_str(rc));
-                return rc;
+                LOG(LOG_ERR, "dfs_mknod_timeout: %s", dpl_status_str(rc));
+                ret = -1;
+                goto err;
         }
 
-        return 0;
+        ret = 0;
+  err:
+        return ret;
 }

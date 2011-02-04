@@ -4,6 +4,7 @@
 #include "unlink.h"
 #include "file.h"
 #include "log.h"
+#include "timeout.h"
 
 extern dpl_ctx_t *ctx;
 
@@ -22,9 +23,9 @@ dfs_rename(const char *oldpath,
                 newpath = p ? p + 1 : oldpath;
         }
 
-        rc = dpl_fcopy(ctx, (char *)oldpath, (char *)newpath);
+        rc = dfs_fcopy_timeout(ctx, oldpath, newpath);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dpl_fcopy: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dfs_fcopy_timeout: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }

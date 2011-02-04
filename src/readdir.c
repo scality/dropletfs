@@ -2,6 +2,7 @@
 
 #include "readdir.h"
 #include "log.h"
+#include "timeout.h"
 
 extern dpl_ctx_t *ctx;
 
@@ -19,17 +20,15 @@ dfs_readdir(const char *path,
         LOG(LOG_DEBUG, "path=%s, data=%p, fill=%p, offset=%lld, info=%p",
             path, data, (void *)fill, (long long)offset, (void *)info);
 
-        rc = dpl_chdir(ctx, (char *)path);
-
+        rc = dfs_chdir_timeout(ctx, path);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dpl_chdir: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dfs_chdir_timeout: %s", dpl_status_str(rc));
                 return rc;
         }
 
-        rc = dpl_opendir(ctx, ".", &dir_hdl);
-
+        rc = dfs_opendir_timeout(ctx, ".", &dir_hdl);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dpl_opendir: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dfs_opendir_timeout: %s", dpl_status_str(rc));
                 return rc;
         }
 

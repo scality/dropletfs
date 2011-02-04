@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "log.h"
 #include "tmpstr.h"
+#include "timeout.h"
 
 extern GHashTable *hash;
 extern struct conf *conf;
@@ -23,10 +24,9 @@ dfs_unlink(const char *path)
 
         LOG(LOG_DEBUG, "path=%s", path);
 
-        rc = dpl_unlink(ctx, (char *)path);
-
+        rc = dfs_unlink_timeout(ctx, path);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dpl_unlink: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_unlink_timeout: %s", dpl_status_str(rc));
                 ret = 1;
                 goto end;
         }

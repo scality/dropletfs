@@ -9,6 +9,7 @@
 #include "metadata.h"
 #include "hash.h"
 #include "regex.h"
+#include "timeout.h"
 
 extern struct conf *conf;
 extern dpl_ctx_t *ctx;
@@ -26,8 +27,6 @@ dfs_create(const char *path,
         struct stat st;
         int fd = -1;
         dpl_dict_t *meta = NULL;
-        int tries = 0;
-        int delay = 1;
         int exclude;
 
         LOG(LOG_DEBUG, "%s, mode=0x%x, %s",
@@ -44,26 +43,15 @@ dfs_create(const char *path,
         if (! exclude) {
                 ino = dpl_cwd(ctx, ctx->cur_bucket);
 
-          namei_retry:
-                rc = dpl_namei(ctx, (char *)path, ctx->cur_bucket,
-                               ino, &parent, &obj, &type);
+                rc = dfs_namei_timeout(ctx, path, ctx->cur_bucket,
+                                       ino, &parent, &obj, &type);
 
                 LOG(LOG_DEBUG, "path=%s, ino=%s, parent=%s, obj=%s, type=%s",
                     path, ino.key, parent.key, obj.key, ftype_to_str(type));
 
                 if (DPL_SUCCESS != rc && DPL_ENOENT != rc) {
-                        if (tries < conf->max_retry) {
-                                tries++;
-                                sleep(delay);
-                                delay *= 2;
-                                LOG(LOG_NOTICE, "namei timeout? (%s)",
-                                    dpl_status_str(rc));
-                                goto namei_retry;
-                        }
-                        /* TODO handle the following cases here:
-                         *   - we do not have permissions to do so
-                         */
-                        LOG(LOG_ERR, "dpl_namei: %s", dpl_status_str(rc));
+                        LOG(LOG_ERR, "dfs_namei_timeout: %s",
+                            dpl_status_str(rc));
                         ret = -1;
                         goto err;
                 }
@@ -103,21 +91,9 @@ dfs_create(const char *path,
         assign_meta_to_dict(meta, "mode", &mode);
 
         if (! exclude) {
-                delay = 1;
-                tries = 0;
-          retry:
-                rc = dpl_mknod(ctx, (char *)path);
-
+                rc = dfs_mknod_timeout(ctx, path);
                 if (DPL_SUCCESS != rc) {
-                        if ((tries < conf->max_retry)) {
-                                LOG(LOG_NOTICE, "mknod: timeout? (%s)",
-                                    dpl_status_str(rc));
-                                tries++;
-                                sleep(delay);
-                                delay *= 2;
-                                goto retry;
-                        }
-                        LOG(LOG_ERR, "dpl_mknod (%s)", dpl_status_str(rc));
+                        LOG(LOG_ERR, "dfs_mknod_timeout: %s", dpl_status_str(rc));
                         ret = -1;
                         goto err;
                 }

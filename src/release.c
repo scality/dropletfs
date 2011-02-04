@@ -98,8 +98,6 @@ dfs_release(const char *path,
         char *zlocal = NULL;
         FILE *fpsrc = NULL;
         FILE *fpdst = NULL;
-        int tries = 0;
-        int delay = 1;
 
         LOG(LOG_DEBUG, "path=%s, %s", path, flags_to_str(info->flags));
 
@@ -162,26 +160,23 @@ dfs_release(const char *path,
                         LOG(LOG_ERR, "fopen: %s", strerror(errno));
                         LOG(LOG_NOTICE, "send the file uncompressed");
                         ret = 0;
-                        goto retry;
-                }
+                } else {
+                        zfd = compress_before_sending(fpsrc, fpdst, dict, &zsize);
 
-                zfd = compress_before_sending(fpsrc, fpdst, dict, &zsize);
+                        /* error in source file, don't upload it */
+                        if (zfd < 0) {
+                                ret = -1;
+                                goto err;
+                        }
 
-                /* error in source file, don't upload it */
-                if (zfd < 0) {
-                        ret = -1;
-                        goto err;
-                }
-
-                /* file correctly compressed, send it */
-                if (zfd > 0) {
-                        size = zsize;
-                        fd_tosend = zfd;
+                        /* file correctly compressed, send it */
+                        if (zfd > 0) {
+                                size = zsize;
+                                fd_tosend = zfd;
+                        }
                 }
         }
 
-  retry:
-        vfile = NULL;
         rc = dpl_openwrite(ctx,
                            (char *)path,
                            DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
@@ -191,15 +186,7 @@ dfs_release(const char *path,
                            &vfile);
 
         if (DPL_SUCCESS != rc) {
-                if (rc != DPL_ENOENT && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE,
-                            "dpl_openwrite timeout? (delay=%d)", delay);
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        goto retry;
-                }
-                LOG(LOG_ERR, "dpl_openwrite: %s (%d)", dpl_status_str(rc), rc);
+                LOG(LOG_ERR, "dpl_openwrite: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
