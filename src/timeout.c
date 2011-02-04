@@ -3,6 +3,13 @@
 #include "timeout.h"
 #include "log.h"
 
+#define ERR_TIMEOUT(func) do {                                  \
+                LOG(LOG_ERR, #func ": %s", dpl_status_str(rc)); \
+                tries++;                                        \
+                sleep(delay);                                   \
+                delay *= 2;                                     \
+        } while (0)
+
 dpl_status_t
 dfs_getattr_timeout(dpl_ctx_t *ctx,
                     const char *path,
@@ -14,13 +21,9 @@ dfs_getattr_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_getattr(ctx, (char *)path, metadata);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc && DPL_EISDIR != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_getattr: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_getattr);
                         goto retry;
                 }
         }
@@ -39,15 +42,9 @@ dfs_setattr_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_setattr(ctx, (char *)path, metadata);
-        if (DPL_FAILURE == rc) {
-                if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_getattr: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
-                        goto retry;
-                }
+        if (DPL_SUCCESS != rc && DPL_EISDIR != rc && (tries < conf->max_retry)) {
+                ERR_TIMEOUT(dpl_setattr);
+                goto retry;
         }
 
         return rc;
@@ -67,11 +64,7 @@ dfs_mknod_timeout(dpl_ctx_t *ctx,
         rc = dpl_mknod(ctx, (char *)path);
         if (DPL_SUCCESS != rc) {
                 if (tries < conf->max_retry) {
-                        LOG(LOG_NOTICE, "mknod: timeout? (%s)",
-                            dpl_status_str(rc));
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_mknod);
                         goto retry;
                 }
         }
@@ -91,11 +84,7 @@ dfs_mkdir_timeout(dpl_ctx_t *ctx,
         rc = dpl_mkdir(ctx, (char *)path);
         if (DPL_FAILURE == rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_mkdir: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_mkdir);
                         goto retry;
                 }
         }
@@ -115,11 +104,7 @@ dfs_unlink_timeout(dpl_ctx_t *ctx,
         rc = dpl_unlink(ctx, (char *)path);
         if (DPL_FAILURE == rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_unlink: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_unlink);
                         goto retry;
                 }
         }
@@ -139,11 +124,7 @@ dfs_rmdir_timeout(dpl_ctx_t *ctx,
         rc = dpl_rmdir(ctx, (char *)path);
         if (DPL_FAILURE == rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_rmdir: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_rmdir);
                         goto retry;
                 }
         }
@@ -164,11 +145,7 @@ dfs_fcopy_timeout(dpl_ctx_t *ctx,
         rc = dpl_fcopy(ctx, (char *)oldpath, (char *)newpath);
         if (DPL_FAILURE == rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_fcopy: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_fcopy);
                         goto retry;
                 }
         }
@@ -188,11 +165,7 @@ dfs_chdir_timeout(dpl_ctx_t *ctx,
         rc = dpl_chdir(ctx, (char *)path);
         if (DPL_FAILURE == rc) {
                 if (DPL_EINVAL != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_chdir: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_chdir);
                         goto retry;
                 }
         }
@@ -213,11 +186,7 @@ dfs_opendir_timeout(dpl_ctx_t *ctx,
         rc = dpl_opendir(ctx, (char *)path, dir_hdl);
         if (DPL_FAILURE == rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        LOG(LOG_NOTICE, "dpl_opendir: timeout? (%s)",
-                            dpl_status_str(rc));
-                        sleep(delay);
-                        tries++;
-                        delay *= 2;
+                        ERR_TIMEOUT(dpl_opendir);
                         goto retry;
                 }
         }
@@ -248,11 +217,7 @@ dfs_namei_timeout(dpl_ctx_t *ctx,
 
         if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "dpl_namei timeout? (%s)",
-                            dpl_status_str(rc));
+                        ERR_TIMEOUT(dpl_namei);
                         goto retry;
                 }
         }
@@ -281,11 +246,7 @@ dfs_head_all_timeout(dpl_ctx_t *ctx,
                           metadatap);
         if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
-                        tries++;
-                        sleep(delay);
-                        delay *= 2;
-                        LOG(LOG_NOTICE, "dpl_head_all timeout? (%s)",
-                            dpl_status_str(rc));
+                        ERR_TIMEOUT(dpl_head_all);
                         goto retry;
                 }
         }

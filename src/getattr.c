@@ -131,11 +131,6 @@ dfs_getattr(const char *path,
             path, dpl_status_str(rc), ftype_to_str(type),
             parent_ino.key, obj_ino.key);
 
-        if (DPL_ENOENT == rc) {
-                ret = rc;
-                goto end;
-        }
-
         if (DPL_SUCCESS != rc) {
                 LOG(LOG_NOTICE, "dfs_namei_timeout: %s", dpl_status_str(rc));
                 ret = rc;
@@ -143,7 +138,7 @@ dfs_getattr(const char *path,
         }
 
         rc = dfs_getattr_timeout(ctx, path, &metadata);
-        if (DPL_SUCCESS != rc && DPL_EISDIR != rc && DPL_ENOENT != rc) {
+        if (DPL_SUCCESS != rc && DPL_EISDIR != rc) {
                 LOG(LOG_ERR, "dfs_getattr_timeout: %s", dpl_status_str(rc));
                 if (metadata)
                         dpl_dict_free(metadata);

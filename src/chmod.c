@@ -19,7 +19,7 @@ dfs_chmod(const char *path,
 
         rc = dfs_getattr_timeout(ctx, path, &metadata);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dfs_getattr_timeout: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_getattr: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
@@ -31,7 +31,7 @@ dfs_chmod(const char *path,
 
         rc = dfs_setattr_timeout(ctx, path, metadata);
         if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dfs_setattr_timeout: %s", dpl_status_str(rc));
+                LOG(LOG_ERR, "dpl_setattr: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
         }
