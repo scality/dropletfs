@@ -82,7 +82,7 @@ dfs_mkdir_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_mkdir(ctx, (char *)path);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_mkdir);
                         goto retry;
@@ -102,7 +102,7 @@ dfs_unlink_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_unlink(ctx, (char *)path);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_unlink);
                         goto retry;
@@ -122,7 +122,7 @@ dfs_rmdir_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_rmdir(ctx, (char *)path);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_rmdir);
                         goto retry;
@@ -143,7 +143,7 @@ dfs_fcopy_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_fcopy(ctx, (char *)oldpath, (char *)newpath);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_fcopy);
                         goto retry;
@@ -163,7 +163,7 @@ dfs_chdir_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_chdir(ctx, (char *)path);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_EINVAL != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_chdir);
                         goto retry;
@@ -184,7 +184,7 @@ dfs_opendir_timeout(dpl_ctx_t *ctx,
 
   retry:
         rc = dpl_opendir(ctx, (char *)path, dir_hdl);
-        if (DPL_FAILURE == rc) {
+        if (DPL_SUCCESS != rc) {
                 if (DPL_ENOENT != rc && (tries < conf->max_retry)) {
                         ERR_TIMEOUT(dpl_opendir);
                         goto retry;
