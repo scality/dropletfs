@@ -53,7 +53,7 @@ You can change its value through DROPLETFS_CACHE_DIR.  Default is /tmp.
 
 DROPLETFS_GC_AGE_THRESHOLD (in seconds): a cache file older than this value
 will be removed.  If zero, the garbage collection is not triggered. Default
-is 0.
+is 900.
 DROPLETFS_GC_LOOP_DELAY (in seconds): the GC is invoked with this period.
 Default is 60.
 
