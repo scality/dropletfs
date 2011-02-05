@@ -26,9 +26,10 @@ assign_meta_to_dict(dpl_dict_t *dict,
                     unsigned long val)
 {
         char *buf = NULL;
-        LOG(LOG_DEBUG, "meta='%s', value='%s'", meta, buf);
 
         buf = tmpstr_printf("%lu", val);
+        LOG(LOG_DEBUG, "meta='%s', value='%s'", meta, buf);
+
         if (DPL_SUCCESS != dpl_dict_update_value(dict, meta, buf))
                 LOG(LOG_ERR, "can't update value '%s' for '%s'", buf, meta);
 }
