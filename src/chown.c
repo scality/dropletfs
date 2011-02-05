@@ -13,12 +13,13 @@ dfs_chown(const char *path,
           uid_t uid,
           gid_t gid)
 {
+        return 0;
         dpl_dict_t *metadata = NULL;
         dpl_status_t rc;
         int ret;
 
-        LOG(LOG_DEBUG, "%s, uid=%llu, gid=%llu",
-            path, (unsigned long long)uid, (unsigned long long)gid);
+        LOG(LOG_DEBUG, "%s, uid=%lu, gid=%lu",
+            path, (unsigned long)uid, (unsigned long)gid);
 
         rc = dfs_getattr_timeout(ctx, path, &metadata);
         if (DPL_SUCCESS != rc) {

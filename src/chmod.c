@@ -11,6 +11,7 @@ int
 dfs_chmod(const char *path,
           mode_t mode)
 {
+        return 0;
         dpl_dict_t *metadata = NULL;
         dpl_status_t rc;
         int ret;
