@@ -185,10 +185,12 @@ conf_set_full_cache_dir(struct conf *conf)
                 goto err;
         }
 
-        if (-1 == mkdir(conf->cache_dir, 0777) && EEXIST != errno) {
-                perror("mkdir");
-                ret = -1;
-                goto err;
+        if (-1 == mkdir(conf->cache_dir, S_IRWXU)) {
+                if (EEXIST != errno) {
+                        perror("mkdir");
+                        ret = -1;
+                        goto err;
+                }
         }
 
         /* remove the trailing slashes */

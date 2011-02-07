@@ -31,10 +31,10 @@ mkdir_tree(const char *dir) {
         for (p = tmp + 1; *p; p++) {
                 if ('/' == *p) {
                         *p = 0;
-                        MKDIR(tmp, 0755);
+                        MKDIR(tmp, S_IRWXU);
                         *p = '/';
                 }
         }
 
-        MKDIR(tmp, 0755);
+        MKDIR(tmp, S_IRWXU);
 }
