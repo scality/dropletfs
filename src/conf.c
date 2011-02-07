@@ -484,6 +484,14 @@ conf_ctor(struct conf *conf,
 
         path = tmpstr_printf("%s/%s", tmp, DEFAULT_CONFIG_FILE);
 
+        /* even if not specified, we have to build a cache dir matching this
+         * pattern: <directory>/<bucket name> */
+        if (-1 == conf_set_full_cache_dir(conf)) {
+                fprintf(stderr, "can't build the cache directory\n");
+                ret = -1;
+                goto err;
+        }
+
         if (-1 == parse_file(conf, path)) {
                 ret = -1;
                 goto err;
