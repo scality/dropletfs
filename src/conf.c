@@ -86,10 +86,8 @@ conf_new(void)
         struct conf *conf = NULL;
 
         conf = malloc(sizeof *conf);
-        if (! conf) {
-                perror("malloc");
-                exit(EXIT_FAILURE);
-        }
+        if (! conf)
+                return NULL;
 
         memset(conf, 0, sizeof *conf);
 
@@ -131,14 +129,17 @@ conf_log(struct conf *conf)
         LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
 }
 
-static void
+static int
 conf_set_root_dir(struct conf *conf,
                   char *root_dir)
 {
         char *p = NULL;
+        int ret;
 
-        if (! root_dir)
-                return;
+        if (! root_dir) {
+                ret = 0;
+                goto end;
+        }
 
         if (conf->root_dir)
                 free(conf->root_dir);
@@ -151,8 +152,13 @@ conf_set_root_dir(struct conf *conf,
         conf->root_dir = strdup(root_dir);
         if (! conf->root_dir) {
                 perror("strdup");
-                exit(EXIT_FAILURE);
+                ret = -1;
+                goto end;
         }
+
+        ret = 0;
+  end:
+        return ret;
 }
 
 static int
@@ -417,22 +423,27 @@ parse_file(struct conf * conf,
         return ret;
 }
 
-static void
+static int
 conf_ctor_default(struct conf *conf,
                   char *root_dir)
 {
-        conf_set_root_dir(conf, root_dir);
+        int ret;
+
+        if (-1 == conf_set_root_dir(conf, root_dir)) {
+                ret = -1;
+                goto err;
+        }
 
         conf->cache_dir = strdup(DEFAULT_CACHE_DIR);
         if (! conf->cache_dir) {
-                perror("strdup");
-                exit(EXIT_FAILURE);
+                ret = -1;
+                goto err;
         }
 
         conf->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
         if (! conf->compression_method) {
-                perror("strdup");
-                exit(EXIT_FAILURE);
+                ret = -1;
+                goto err;
         }
 
         conf->zlib_level = DEFAULT_ZLIB_LEVEL;
@@ -441,6 +452,10 @@ conf_ctor_default(struct conf *conf,
         conf->max_retry = DEFAULT_MAX_RETRY;
         conf->log_level = DEFAULT_LOG_LEVEL;
         re_ctor(&conf->regex, NULL, REG_EXTENDED);
+
+        ret = 0;
+  err:
+        return ret;
 }
 
 int
@@ -452,24 +467,28 @@ conf_ctor(struct conf *conf,
         char *path = NULL;
         char *tmp = NULL;
 
-        conf_ctor_default(conf, root_dir);
+        if (-1 == conf_ctor_default(conf, root_dir)) {
+                fprintf(stderr, "can't build a default config\n");
+                ret = -1;
+                goto err;
+        }
 
         tmp = getenv("HOME");
         if (! tmp) {
                 fprintf(stderr, "no HOME is set, use the default config\n");
                 ret = -1;
-                goto end;
+                goto err;
         }
 
         path = tmpstr_printf("%s/%s", tmp, DEFAULT_CONFIG_FILE);
 
         if (-1 == parse_file(conf, path)) {
                 ret = -1;
-                goto end;
+                goto err;
         }
 
         ret = 0;
-  end:
+  err:
         env_override_conf(conf);
         conf->debug = debug;
 

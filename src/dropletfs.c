@@ -423,15 +423,29 @@ main(int argc,
         droplet_pp(ctx);
 
         conf = conf_new();
-        conf_ctor(conf, argv[1], debug);
+        if (! conf) {
+                fprintf(stderr, "can't allocate config\n");
+                goto err2;
+        }
+
+        if (-1 == conf_ctor(conf, argv[1], debug)) {
+                fprintf(stderr, "can't build a configuration\n");
+                goto err3;
+        }
+
         conf_log(conf);
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
         rc = dfs_fuse_main(&args);
 
         dpl_ctx_free(ctx);
+
         if (hash)
                 g_hash_table_remove_all(hash);
+
+  err3:
+        if (conf)
+                conf_free(conf);
   err2:
 	dpl_free();
   err1:
