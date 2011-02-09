@@ -31,6 +31,9 @@ void hash_print_all(void);
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
 
+void pentry_set_atime(pentry_t *);
+time_t pentry_get_atime(pentry_t *);
+
 char *pentry_placeholder_to_str(int);
 void pentry_set_placeholder(pentry_t *, int);
 int pentry_get_placeholder(pentry_t *);
@@ -42,9 +45,12 @@ struct list *pentry_get_dirents(pentry_t *);
 
 void pentry_unlink_cache_file(pentry_t *);
 
-int pentry_lock(pentry_t *);
 int pentry_trylock(pentry_t *);
+int pentry_lock(pentry_t *);
 int pentry_unlock(pentry_t *);
+int pentry_md_trylock(pentry_t *);
+int pentry_md_lock(pentry_t *);
+int pentry_md_unlock(pentry_t *);
 
 void pentry_inc_refcount(pentry_t *);
 void pentry_dec_refcount(pentry_t *);

@@ -1,3 +1,4 @@
+#include <glib.h>
 #include <droplet.h>
 
 #include "chown.h"
@@ -5,8 +6,10 @@
 #include "metadata.h"
 #include "timeout.h"
 #include "tmpstr.h"
+#include "hash.h"
 
 extern dpl_ctx_t *ctx;
+extern GHashTable *hash;
 
 int
 dfs_chown(const char *path,
@@ -17,6 +20,7 @@ dfs_chown(const char *path,
         dpl_dict_t *metadata = NULL;
         dpl_status_t rc;
         int ret;
+        pentry_t *pe = NULL;
 
         LOG(LOG_DEBUG, "%s, uid=%lu, gid=%lu",
             path, (unsigned long)uid, (unsigned long)gid);
@@ -42,8 +46,10 @@ dfs_chown(const char *path,
         }
 
         pe = g_hash_table_lookup(hash, path);
-        if (pe)
+        if (pe) {
                 pentry_set_metadata(pe, metadata);
+                pentry_set_atime(pe);
+        }
 
         ret = 0;
   err:

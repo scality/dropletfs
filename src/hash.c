@@ -20,6 +20,7 @@ struct pentry {
         struct stat st;
         char digest[MD5_DIGEST_LENGTH];
         dpl_dict_t *metadata;
+        pthread_mutex_t md_mutex;
         pthread_mutex_t mutex;
         sem_t refcount;
         int flag;
@@ -27,6 +28,7 @@ struct pentry {
         filetype_t filetype;
         struct list *dirent;
         int ondisk;
+        time_t atime;
 };
 
 
@@ -35,6 +37,7 @@ pentry_new(void)
 {
         pentry_t *pe = NULL;
         pthread_mutexattr_t attr;
+        pthread_mutexattr_t md_attr;
         int rc;
 
         pe = malloc(sizeof *pe);
@@ -61,6 +64,20 @@ pentry_new(void)
         if (rc) {
                 LOG(LOG_INFO, "pthread_mutex_init mutex@%p %s",
                     (void *)&pe->mutex, strerror(rc));
+                goto release;
+        }
+
+        rc = pthread_mutexattr_init(&md_attr);
+        if (rc) {
+                LOG(LOG_INFO, "pthread_mutexattr_init mutex@%p: %s",
+                    (void *)&pe->md_mutex, strerror(rc));
+                goto release;
+        }
+
+        rc = pthread_mutex_init(&pe->md_mutex, &attr);
+        if (rc) {
+                LOG(LOG_INFO, "pthread_mutex_init mutex@%p %s",
+                    (void *)&pe->md_mutex, strerror(rc));
                 goto release;
         }
 
@@ -95,6 +112,22 @@ pentry_free(pentry_t *pe)
 
         list_free(pe->dirent);
         free(pe);
+}
+
+void
+pentry_set_atime(pentry_t *pe)
+{
+        assert(pe);
+
+        pe->atime = time(NULL);
+}
+
+time_t
+pentry_get_atime(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->atime;
 }
 
 char *
@@ -282,8 +315,9 @@ pentry_get_exclude(pentry_t *pe)
         return pe->exclude;
 }
 
-int
-pentry_trylock(pentry_t *pe)
+static int
+pentry_gen_trylock(pentry_t *pe,
+                   pthread_mutex_t *lock)
 {
         int ret;
 
@@ -291,7 +325,7 @@ pentry_trylock(pentry_t *pe)
 
         LOG(LOG_DEBUG, "path=%s: trylock(fd=%d)...", pe->path, pe->fd);
 
-        ret = pthread_mutex_trylock(&pe->mutex);
+        ret = pthread_mutex_trylock(lock);
 
         LOG(LOG_DEBUG, "path=%s fd=%d: %sacquired",
             pe->path, pe->fd, ret ? "not " : "");
@@ -299,8 +333,9 @@ pentry_trylock(pentry_t *pe)
         return ret;
 }
 
-int
-pentry_lock(pentry_t *pe)
+static int
+pentry_gen_lock(pentry_t *pe,
+                pthread_mutex_t *lock)
 {
         int ret;
 
@@ -308,7 +343,7 @@ pentry_lock(pentry_t *pe)
 
         LOG(LOG_DEBUG, "path=%s: lock(fd=%d)...", pe->path, pe->fd);
 
-        ret = pthread_mutex_lock(&pe->mutex);
+        ret = pthread_mutex_lock(lock);
         if (ret)
                 LOG(LOG_ERR, "path=%s, fd=%d: %s",
                     pe->path, pe->fd, strerror(errno));
@@ -316,12 +351,12 @@ pentry_lock(pentry_t *pe)
                 LOG(LOG_DEBUG, "path=%s, fd=%d: acquired",
                     pe->path, pe->fd);
 
-
         return ret;
 }
 
-int
-pentry_unlock(pentry_t *pe)
+static int
+pentry_gen_unlock(pentry_t *pe,
+                  pthread_mutex_t *lock)
 {
         int ret;
 
@@ -329,7 +364,7 @@ pentry_unlock(pentry_t *pe)
 
         LOG(LOG_DEBUG, "path=%s, unlock(fd=%d)...", pe->path, pe->fd);
 
-        ret = pthread_mutex_unlock(&pe->mutex);
+        ret = pthread_mutex_unlock(lock);
         if (ret)
                 LOG(LOG_ERR, "path=%s, fd=%d: %s",
                     pe->path, pe->fd, strerror(errno));
@@ -338,6 +373,67 @@ pentry_unlock(pentry_t *pe)
 
         return ret;
 }
+
+int
+pentry_trylock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s: trylock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_trylock(pe, &pe->mutex);
+}
+
+int
+pentry_lock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s: lock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_lock(pe, &pe->mutex);
+}
+
+int
+pentry_unlock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s, unlock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_unlock(pe, &pe->mutex);
+}
+
+int
+pentry_md_trylock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s: trylock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_trylock(pe, &pe->md_mutex);
+}
+
+int
+pentry_md_lock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s: lock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_lock(pe, &pe->md_mutex);
+}
+
+int
+pentry_md_unlock(pentry_t *pe)
+{
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s, unlock(fd=%d)...", pe->path, pe->fd);
+
+        return pentry_gen_unlock(pe, &pe->md_mutex);
+}
+
 
 filetype_t
 pentry_get_filetype(pentry_t *pe)

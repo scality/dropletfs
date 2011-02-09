@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "hash.h"
+
 int dfs_getattr(const char *, struct stat *);
 
 #endif /* GETATTR_H */

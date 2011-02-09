@@ -9,7 +9,6 @@
 #include "file.h"
 #include "metadata.h"
 #include "timeout.h"
-#include "hash.h"
 #include "list.h"
 
 extern dpl_ctx_t *ctx;
@@ -96,6 +95,10 @@ getattr_remote(pentry_t *pe,
 
         LOG(LOG_DEBUG, "%s: get remote metadata through hashtable", path);
 
+        if (pentry_md_lock(pe)) {
+                ret = -1;
+                goto err;
+        }
         meta = pentry_get_metadata(pe);
         if (meta) {
                 fill_stat_from_metadata(st, meta);
@@ -103,7 +106,13 @@ getattr_remote(pentry_t *pe,
                         st->st_mode |= S_IFLNK;
         }
 
+        if (pentry_md_unlock(pe)) {
+                ret = -1;
+                goto err;
+        }
+
         ret = 0;
+  err:
         return ret;
 }
 
@@ -192,7 +201,19 @@ getattr_unset(pentry_t *pe,
                 if (dpl_dict_get(metadata, "symlink"))
                         st->st_mode |= S_IFLNK;
                 fill_stat_from_metadata(st, metadata);
+
+                if (pentry_md_lock(pe)) {
+                        ret = -1;
+                        goto end;
+                }
+
                 pentry_set_metadata(pe, metadata);
+
+                if (pentry_md_unlock(pe)) {
+                        ret = -1;
+                        goto end;
+                }
+
                 pentry_set_placeholder(pe, FILE_REMOTE);
         }
 
@@ -245,6 +266,8 @@ dfs_getattr(const char *path,
         };
 
         ret = cb[pentry_get_placeholder(pe)](pe, path, st);
+        pentry_set_atime(pe);
+
   end:
         return ret;
 }

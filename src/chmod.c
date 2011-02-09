@@ -5,6 +5,7 @@
 #include "log.h"
 #include "metadata.h"
 #include "timeout.h"
+#include "hash.h"
 
 extern GHashTable *hash;
 extern dpl_ctx_t *ctx;
@@ -41,8 +42,10 @@ dfs_chmod(const char *path,
         }
 
         pe = g_hash_table_lookup(hash, path);
-        if (pe)
+        if (pe) {
                 pentry_set_metadata(pe, metadata);
+                pentry_set_atime(pe);
+        }
 
         ret = 0;
   err:
