@@ -42,6 +42,7 @@
 #include "symlink.h"
 #include "readlink.h"
 
+#include "cachedir.h"
 #include "gc.h"
 #include "regex.h"
 #include "conf.h"
@@ -139,13 +140,20 @@ dfs_init(struct fuse_conn_info *conn)
 {
         (void)conn;
         pthread_t gc_id;
+        pthread_t cachedir_id;
         pthread_attr_t gc_attr;
+        pthread_attr_t cachedir_attr;
+
 
         LOG(LOG_DEBUG, "Entering function");
 
         pthread_attr_init(&gc_attr);
         pthread_attr_setdetachstate(&gc_attr, PTHREAD_CREATE_JOINABLE);
         pthread_create(&gc_id, &gc_attr, thread_gc, hash);
+
+        pthread_attr_init(&cachedir_attr);
+        pthread_attr_setdetachstate(&cachedir_attr, PTHREAD_CREATE_JOINABLE);
+        pthread_create(&cachedir_id, &cachedir_attr, thread_cachedir, hash);
 
         return NULL;
 }
@@ -160,8 +168,10 @@ cb_hash_unlink(gpointer key,
         pentry_t *pe = value;
 
         if (pe) {
-                LOG(LOG_INFO, "remove cache file '%s'", pentry_get_path(pe));
-                pentry_unlink_cache_file(pe);
+                if (FILE_LOCAL == pentry_get_placeholder(pe)) {
+                        LOG(LOG_INFO, "remove cache file '%s'", pentry_get_path(pe));
+                        pentry_unlink_cache_file(pe);
+                }
         }
 }
 

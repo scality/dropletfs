@@ -82,13 +82,12 @@ dfs_create(const char *path,
         fchmod(fd, mode);
 
         meta = pentry_get_metadata(pe);
-        if (! meta) {
-                LOG(LOG_DEBUG, "NULL metadata associated with fd=%d", fd);
-                goto err;
-        }
+        if (! meta)
+                meta = dpl_dict_new(13);
 
         fill_metadata_from_stat(meta, &st);
         assign_meta_to_dict(meta, "mode", (unsigned long)mode);
+        pentry_set_metadata(pe, meta);
 
         if (! exclude) {
                 rc = dfs_mknod_timeout(ctx, path);
@@ -101,6 +100,9 @@ dfs_create(const char *path,
 
         ret = 0;
   err:
+        if (meta)
+                dpl_dict_free(meta);
+
         LOG(LOG_DEBUG, "exiting function (return value=%d)", ret);
         return ret;
 

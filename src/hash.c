@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "metadata.h"
 #include "tmpstr.h"
+#include "list.h"
 
 extern GHashTable *hash;
 extern struct conf *conf;
@@ -23,6 +24,9 @@ struct pentry {
         sem_t refcount;
         int flag;
         int exclude;
+        filetype_t filetype;
+        struct list *dirent;
+        int ondisk;
 };
 
 
@@ -37,12 +41,6 @@ pentry_new(void)
         if (! pe) {
                 LOG(LOG_CRIT, "out of memory");
                 return NULL;
-        }
-
-        pe->metadata = dpl_dict_new(13);
-        if (! pe->metadata) {
-                LOG(LOG_ERR, "dpl_dict_new: can't allocate memory");
-                goto release;
         }
 
         rc = sem_init(&pe->refcount, 0, 0);
@@ -66,6 +64,10 @@ pentry_new(void)
                 goto release;
         }
 
+        pe->metadata = NULL;
+        pe->ondisk = FILE_UNSET;
+        pe->fd = -1;
+        pe->dirent = NULL;
         pe->path = NULL;
         pe->exclude = 0;
         pe->flag = FLAG_DIRTY;
@@ -91,7 +93,103 @@ pentry_free(pentry_t *pe)
         (void)pthread_mutex_destroy(&pe->mutex);
         (void)sem_destroy(&pe->refcount);
 
+        list_free(pe->dirent);
         free(pe);
+}
+
+char *
+pentry_placeholder_to_str(int flag)
+{
+        switch (flag) {
+        case FILE_LOCAL: return "local";
+        case FILE_REMOTE: return "remote";
+        case FILE_UNSET: return "unset";
+        }
+
+        assert(! "impossible case");
+        return "invalid";
+}
+
+void
+pentry_set_placeholder(pentry_t *pe,
+                       int flag)
+{
+        assert(pe);
+
+        pe->ondisk = flag;
+}
+
+int
+pentry_get_placeholder(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->ondisk;
+}
+
+static int
+cb_compare_path(void *p1,
+                void *p2)
+{
+        char *path1 = p1;
+        char *path2 = p2;
+
+        assert(p1);
+        assert(p2);
+
+        return ! strcmp(path1, path2);
+}
+
+int
+pentry_remove_dirent(pentry_t *pe,
+                     const char *path)
+{
+        int ret;
+
+        assert(pe);
+
+        if (! path) {
+                LOG(LOG_ERR, "NULL path");
+                ret = -1;
+                goto err;
+        }
+
+        if (FILE_DIR != pe->filetype) {
+                LOG(LOG_ERR, "%s: is not a directory", path);
+                ret = -1;
+                goto err;
+        }
+
+        pe->dirent = list_remove(pe->dirent, (char *)path, cb_compare_path);
+
+        ret = 0;
+  err:
+        return ret;
+}
+
+void
+pentry_add_dirent(pentry_t *pe,
+                  const char *path)
+{
+        char *key = NULL;
+
+        assert(pe);
+
+        LOG(LOG_DEBUG, "path=%s", path);
+
+        key = strdup(path);
+        if (! key)
+                LOG(LOG_ERR, "%s: strdup: %s", path, strerror(errno));
+        else
+                pe->dirent = list_add(pe->dirent, key);
+}
+
+struct list *
+pentry_get_dirents(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->dirent;
 }
 
 void
@@ -241,6 +339,23 @@ pentry_unlock(pentry_t *pe)
         return ret;
 }
 
+filetype_t
+pentry_get_filetype(pentry_t *pe)
+{
+        assert(pe);
+
+        return pe->filetype;
+}
+
+void
+pentry_set_filetype(pentry_t *pe,
+                    filetype_t type)
+{
+        assert(pe);
+
+        pe->filetype = type;
+}
+
 void
 pentry_set_fd(pentry_t *pe,
               int fd)
@@ -331,14 +446,25 @@ pentry_get_digest(pentry_t *pe)
         return pe->digest;
 }
 
+char *
+pentry_type_to_str(filetype_t type)
+{
+        switch (type) {
+        case FILE_REG: return "regular file";
+        case FILE_DIR: return "directory";
+        case FILE_SYMLINK: return "symlink";
+        default: return "unknown";
+        }
+}
 
 static void
 print(void *key, void *data, void *user_data)
 {
         char *path = key;
         pentry_t *pe = data;
-        LOG(LOG_DEBUG, "key=%s, path=%s, fd=%d, digest=%.*s",
-            path, pe->path, pe->fd, MD5_DIGEST_LENGTH, pe->digest);
+        LOG(LOG_DEBUG, "key=%s, path=%s, fd=%d, type=%s, digest=%.*s",
+            path, pe->path, pe->fd, pentry_type_to_str(pe->filetype),
+            MD5_DIGEST_LENGTH, pe->digest);
 }
 
 void

@@ -1,3 +1,4 @@
+#include <glib.h>
 #include <droplet.h>
 
 #include "rename.h"
@@ -5,8 +6,10 @@
 #include "file.h"
 #include "log.h"
 #include "timeout.h"
+#include "hash.h"
 
 extern dpl_ctx_t *ctx;
+extern GHashTable *hash;
 
 static int
 rename_file(const char *oldpath,
@@ -14,12 +17,27 @@ rename_file(const char *oldpath,
 {
         int ret;
         dpl_status_t rc;
+        char *p = NULL;
+        char *dirname = NULL;
+        pentry_t *pe_dir = NULL;
 
         rc = dfs_fcopy_timeout(ctx, oldpath, newpath);
         if (DPL_SUCCESS != rc) {
                 LOG(LOG_ERR, "dfs_fcopy_timeout: %s", dpl_status_str(rc));
                 ret = -1;
                 goto err;
+        }
+
+        dirname = (char *)newpath;
+        p = strrchr(dirname, '/');
+        if (p) {
+                if (p != newpath) {
+                        *p = 0;
+                        pe_dir = g_hash_table_lookup(hash, dirname);
+                        *p = '/';
+                        if (pe_dir)
+                                (void)pentry_remove_dirent(pe_dir, oldpath);
+                }
         }
 
         ret = dfs_unlink(oldpath);

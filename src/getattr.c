@@ -9,6 +9,8 @@
 #include "file.h"
 #include "metadata.h"
 #include "timeout.h"
+#include "hash.h"
+#include "list.h"
 
 extern dpl_ctx_t *ctx;
 extern struct conf *conf;
@@ -35,79 +37,120 @@ set_default_stat(struct stat *st,
         st->st_size = 0;
 }
 
-
-/*
- * return 0 if we have to grab local stat info
- * return -1 if we have to call dpl_getattr() on remote object
- */
-static int
-dfs_getattr_cached(pentry_t *pe,
-                   struct stat *st)
+static void
+set_filetype_from_stat(pentry_t *pe,
+                       struct stat *st)
 {
+        if (st->st_mode | S_IFREG)
+                pentry_set_filetype(pe, FILE_REG);
+        else if (st->st_mode | S_IFDIR)
+                pentry_set_filetype(pe, FILE_DIR);
+        else if (st->st_mode | S_IFLNK)
+                pentry_set_filetype(pe, FILE_SYMLINK);
+}
+
+static int
+hash_fill_dirent(GHashTable *hash,
+                 const char *path)
+{
+        char *dirname = NULL;
+        char *p = NULL;
         int ret;
-        int fd;
-        int exclude;
-        dpl_dict_t *dict = NULL;
+        pentry_t *dir = NULL;
 
-        exclude = pentry_get_exclude(pe);
-        fd = pentry_get_fd(pe);
-        LOG(LOG_DEBUG, "path=%s, pe@%p, fd=%d",
-            pentry_get_path(pe), (void *)pe, fd);
-
-        /* if the flag is CLEAN, then the file was successfully uploaded,
-         * just grab its metadata */
-        if (FLAG_CLEAN == pentry_get_flag(pe) && !exclude) {
-                LOG(LOG_INFO, "path=%s, file upload is finished",
-                    pentry_get_path(pe));
+        dirname = (char *)path;
+        p = strrchr(dirname, '/');
+        if (! p) {
+                LOG(LOG_ERR, "%s: no root dir in path", path);
                 ret = -1;
-                goto end;
+                goto err;
         }
 
-        /* otherwise, use the `struct stat' info of local cache file
-         * descriptor */
-        if (-1 == fstat(fd, st)) {
-                LOG(LOG_ERR, "fstat: %s", strerror(errno));
+        if (p != path)
+                *p = 0;
+
+        dir = g_hash_table_lookup(hash, dirname);
+        if (! dir) {
+                LOG(LOG_ERR, "can't find '%s' in the hashtable", dirname);
                 ret = -1;
-                goto end;
+                goto err;
         }
 
-        /* special case for symlinks */
-        dict = pentry_get_metadata(pe);
-        if (dict && dpl_dict_get(dict, "symlink"))
-                st->st_mode |= S_IFLNK;
+        if (! *p)
+                *p = '/';
 
-        LOG(LOG_INFO, "path=%s, use the cache fd (%d) to fill struct stat",
-            pentry_get_path(pe), fd);
+        pentry_add_dirent(dir, path);
+
         ret = 0;
-  end:
+  err:
         return ret;
 }
 
-int
-dfs_getattr(const char *path,
-            struct stat *st)
+static int
+getattr_remote(pentry_t *pe,
+              const char *path,
+              struct stat *st)
+{
+        int ret;
+        dpl_dict_t *meta = NULL;
+
+        LOG(LOG_DEBUG, "%s: get remote metadata through hashtable", path);
+
+        meta = pentry_get_metadata(pe);
+        if (meta) {
+                fill_stat_from_metadata(st, meta);
+                if (dpl_dict_get(meta, "symlink"))
+                        st->st_mode |= S_IFLNK;
+        }
+
+        ret = 0;
+        return ret;
+}
+
+static int
+getattr_local(pentry_t *pe,
+              const char *path,
+              struct stat *st)
+{
+        int fd;
+        int ret;
+        int exclude;
+
+        exclude = pentry_get_exclude(pe);
+        fd = pentry_get_fd(pe);
+
+        LOG(LOG_DEBUG, "%s: get local metadata through fstat(fd=%d)", path, fd);
+
+        if (fd < 0) {
+                LOG(LOG_ERR, "path=%s: invalid fd=%d", path, fd);
+                ret = -1;
+                goto err;
+        }
+
+        if (-1 == fstat(fd, st)) {
+                LOG(LOG_ERR, "path=%s: fstat(fd=%d, ...): %s",
+                    path, fd, strerror(errno));
+                ret = -1;
+                goto err;
+        }
+
+        ret = 0;
+  err:
+        return ret;
+}
+
+static int
+getattr_unset(pentry_t *pe,
+              const char *path,
+              struct stat *st)
 {
         dpl_ftype_t type;
         dpl_ino_t ino, parent_ino, obj_ino;
         dpl_status_t rc;
         dpl_dict_t *metadata = NULL;
-        pentry_t *pe = NULL;
         int ret;
 
-        LOG(LOG_DEBUG, "path=%s, st=%p", path, (void *)st);
-
-        memset(st, 0, sizeof *st);
-
-        pe = g_hash_table_lookup(hash, path);
-        if (pe) {
-                /* if the file isn't fully uploaded, get its metadata */
-                if (0 == dfs_getattr_cached(pe, st))  {
-                        ret = 0;
-                        goto end;
-                }
-        }
-
-        LOG(LOG_DEBUG, "retrieve remote metadata to check synchronization");
+        LOG(LOG_DEBUG, "%s: get remote metadata with dpl_getattr()", path);
 
         /*
          * why setting st_nlink to 1?
@@ -140,8 +183,6 @@ dfs_getattr(const char *path,
         rc = dfs_getattr_timeout(ctx, path, &metadata);
         if (DPL_SUCCESS != rc && DPL_EISDIR != rc) {
                 LOG(LOG_ERR, "dfs_getattr_timeout: %s", dpl_status_str(rc));
-                if (metadata)
-                        dpl_dict_free(metadata);
                 ret = -1;
                 goto end;
         }
@@ -151,10 +192,59 @@ dfs_getattr(const char *path,
                 if (dpl_dict_get(metadata, "symlink"))
                         st->st_mode |= S_IFLNK;
                 fill_stat_from_metadata(st, metadata);
-                dpl_dict_free(metadata);
+                pentry_set_metadata(pe, metadata);
+                pentry_set_placeholder(pe, FILE_REMOTE);
         }
 
+        set_filetype_from_stat(pe, st);
+        (void)hash_fill_dirent(hash, path);
+
         ret = 0;
+  end:
+        if (metadata)
+                dpl_dict_free(metadata);
+
+        return ret;
+}
+
+int
+dfs_getattr(const char *path,
+            struct stat *st)
+{
+        pentry_t *pe = NULL;
+        int ret;
+        char *key = NULL;
+
+        LOG(LOG_DEBUG, "path=%s, st=%p", path, (void *)st);
+
+        memset(st, 0, sizeof *st);
+
+        pe = g_hash_table_lookup(hash, path);
+        if (! pe) {
+                pe = pentry_new();
+                if (! pe) {
+                        LOG(LOG_ERR, "%s: can't add a new cell", path);
+                        ret = -1;
+                        goto end;
+                }
+                pentry_set_path(pe, path);
+                key = strdup(path);
+                if (! key) {
+                        LOG(LOG_ERR, "%s: strdup: %s", path, strerror(errno));
+                        pentry_free(pe);
+                        ret = -1;
+                        goto end;
+                }
+                g_hash_table_insert(hash, key, pe);
+        }
+
+        int (*cb[]) (pentry_t *, const char *, struct stat *) = {
+                [FILE_REMOTE] = getattr_remote,
+                [FILE_LOCAL]  = getattr_local,
+                [FILE_UNSET]  = getattr_unset,
+        };
+
+        ret = cb[pentry_get_placeholder(pe)](pe, path, st);
   end:
         return ret;
 }

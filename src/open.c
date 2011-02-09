@@ -48,6 +48,7 @@ populate_hash(GHashTable *h,
         }
 
         pentry_set_fd(pe, -1);
+        pentry_set_path(pe, path);
         key = strdup(path);
         if (! key) {
                 LOG(LOG_CRIT, "strdup(%s): %s", path, strerror(errno));
@@ -56,7 +57,6 @@ populate_hash(GHashTable *h,
                 goto err;
         }
 
-        pentry_set_path(pe, path);
         *pep = pe;
         g_hash_table_insert(h, key, pe);
 
@@ -131,6 +131,7 @@ open_creat(const char * const path,
         }
 
         LOG(LOG_INFO, "opening cache file '%s'", local);
+
         fd = open(local, flags, 0644);
         if (-1 == fd) {
                 LOG(LOG_ERR, "%s: %s", local, strerror(errno));
@@ -224,7 +225,12 @@ dfs_open(const char *path,
                 LOG(LOG_INFO, "adding file '%s' to the hashtable", path);
         } else {
                 fd = pentry_get_fd(pe);
-                LOG(LOG_INFO, "%s: found in the hashtable, fd=%d", path, fd);
+                if (FILE_LOCAL == pentry_get_placeholder(pe))
+                        LOG(LOG_INFO, "%s: found in the hashtable, and the "
+                            "file is on disk (fd=%d)", path, fd);
+                else
+                        LOG(LOG_INFO, "%s: found in hashtable, but the file "
+                            "isn't downloaded (fd=%d)", path, fd);
         }
 
         info->fh = (uint64_t)pe;
@@ -255,9 +261,10 @@ dfs_open(const char *path,
                 goto err;
         }
 
+        pentry_set_placeholder(pe, FILE_LOCAL);
         ret = 0;
   err:
         LOG(LOG_DEBUG, "@pentry=%p, fd=%d, flags=0x%X, ret=%d",
-            pe, fd, info->flags, ret);
+            pe, pentry_get_fd(pe), info->flags, ret);
         return ret;
 }
