@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "cachedir.h"
 #include "tmpstr.h"
@@ -14,22 +15,23 @@
 #include "timeout.h"
 #include "file.h"
 
-#define MAX_CHILDREN 50
+#define MAX_CHILDREN 10
 
 extern struct conf *conf;
 extern dpl_ctx_t *ctx;
 
-static void
-update_metadata(pentry_t *pe)
+static void *
+update_metadata(void *cb_arg)
 {
+        pentry_t *pe = NULL;
         char *path = NULL;
         dpl_ftype_t type;
         dpl_ino_t ino, parent_ino, obj_ino;
         dpl_status_t rc;
         dpl_dict_t *metadata = NULL;
 
-        if (pentry_md_trylock(pe))
-                return;
+        pe = cb_arg;
+        path = pentry_get_path(pe);
 
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
@@ -51,6 +53,9 @@ update_metadata(pentry_t *pe)
                 goto end;
         }
 
+        if (pentry_md_trylock(pe))
+                goto end;
+
         if (metadata)
                 pentry_set_metadata(pe, metadata);
 
@@ -61,6 +66,9 @@ update_metadata(pentry_t *pe)
                 dpl_dict_free(metadata);
 
         (void)pentry_md_unlock(pe);
+
+        pthread_exit(NULL);
+        return NULL;
 }
 
 static void
@@ -73,7 +81,10 @@ cachedir_callback(gpointer key,
         char *path = NULL;
         pentry_t *pe = NULL;
         time_t age;
-        pid_t pid;
+        pthread_t update_md;
+        pthread_attr_t update_md_attr;
+
+        LOG(LOG_DEBUG, "Entering function");
 
         path = key;
         pe = value;
@@ -83,7 +94,7 @@ cachedir_callback(gpointer key,
 
         LOG(LOG_DEBUG, "%s, age=%d sec, children=%d", path, (int)age, children);
 
-        if (age < 10)
+        if (age < 20)
                 return;
 
         if (children > MAX_CHILDREN)
@@ -91,15 +102,9 @@ cachedir_callback(gpointer key,
 
         children++;
 
-        pid = fork();
-        switch (pid) {
-        case -1:
-                LOG(LOG_ERR, "fork: %s", strerror(errno));
-                break;
-        case 0:
-                update_metadata(pe);
-                exit(1);
-        }
+        pthread_attr_init(&update_md_attr);
+        pthread_attr_setdetachstate(&update_md_attr, PTHREAD_CREATE_JOINABLE);
+        pthread_create(&update_md, &update_md_attr, update_metadata, pe);
 
         children--;
 
@@ -119,7 +124,7 @@ thread_cachedir(void *cb_arg)
                 LOG(LOG_DEBUG, "updating cache directories");
                 g_hash_table_foreach(hash, cachedir_callback, hash);
                 /* TODO: 3 should be a parameter */
-                sleep(3);
+                sleep(10);
         }
 
         return NULL;
