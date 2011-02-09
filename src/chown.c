@@ -41,6 +41,10 @@ dfs_chown(const char *path,
                 goto err;
         }
 
+        pe = g_hash_table_lookup(hash, path);
+        if (pe)
+                pentry_set_metadata(pe, metadata);
+
         ret = 0;
   err:
         if (metadata)

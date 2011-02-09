@@ -1,3 +1,4 @@
+#include <glib.h>
 #include <droplet.h>
 
 #include "chmod.h"
@@ -5,6 +6,7 @@
 #include "metadata.h"
 #include "timeout.h"
 
+extern GHashTable *hash;
 extern dpl_ctx_t *ctx;
 
 int
@@ -15,6 +17,7 @@ dfs_chmod(const char *path,
         dpl_dict_t *metadata = NULL;
         dpl_status_t rc;
         int ret;
+        pentry_t *pe = NULL;
 
         LOG(LOG_DEBUG, "%s", path);
 
@@ -36,6 +39,10 @@ dfs_chmod(const char *path,
                 ret = -1;
                 goto err;
         }
+
+        pe = g_hash_table_lookup(hash, path);
+        if (pe)
+                pentry_set_metadata(pe, metadata);
 
         ret = 0;
   err:
