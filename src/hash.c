@@ -208,7 +208,7 @@ pentry_add_dirent(pentry_t *pe,
 
         assert(pe);
 
-        LOG(LOG_DEBUG, "path=%s", path);
+        LOG(LOG_DEBUG, "path='%s', new entry: '%s'", pentry_get_path(pe), path);
 
         key = strdup(path);
         if (! key)
