@@ -60,16 +60,21 @@ dfs_unlink(const char *path)
         if (! p) {
                 LOG(LOG_ERR, "%s: no root dir", path);
         } else {
-                if (p != path) {
+                if (p == path)
+                        dirname = "/";
+                else
                         *p = 0;
-                        pe_dir = g_hash_table_lookup(hash, dirname);
+
+                pe_dir = g_hash_table_lookup(hash, dirname);
+
+                if (! *p)
                         *p = '/';
-                        if (pe_dir)
-                                (void)pentry_remove_dirent(pe_dir, path);
-                }
+
+                if (pe_dir)
+                        (void)pentry_remove_dirent(pe_dir, path);
         }
 
         ret = 0;
- end:
+  end:
         return ret;
 }

@@ -65,12 +65,15 @@ hash_fill_dirent(GHashTable *hash,
                 goto err;
         }
 
-        if (p != path)
+        /* we are in the root dir */
+        if (p == path)
+                dirname = "/";
+        else
                 *p = 0;
 
         dir = g_hash_table_lookup(hash, dirname);
         if (! dir) {
-                LOG(LOG_ERR, "can't find '%s' in the hashtable", dirname);
+                LOG(LOG_ERR, "'%s' not found in hashtable", dirname);
                 ret = -1;
                 goto err;
         }
@@ -161,19 +164,6 @@ getattr_unset(pentry_t *pe,
 
         LOG(LOG_DEBUG, "%s: get remote metadata with dpl_getattr()", path);
 
-        /*
-         * why setting st_nlink to 1?
-         * see http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FAQ
-         * Section 3.3.5 "Why doesn't find work on my filesystem?"
-         */
-        st->st_nlink = 1;
-
-	if (strcmp(path, "/") == 0) {
-		st->st_mode = S_IFDIR;
-                ret = 0;
-                goto end;
-	}
-
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
         rc = dfs_namei_timeout(ctx, path, ctx->cur_bucket,
@@ -240,6 +230,19 @@ dfs_getattr(const char *path,
 
         memset(st, 0, sizeof *st);
 
+        /*
+         * why setting st_nlink to 1?
+         * see http://sourceforge.net/apps/mediawiki/fuse/index.php?title=FAQ
+         * Section 3.3.5 "Why doesn't find work on my filesystem?"
+         */
+        st->st_nlink = 1;
+
+	if (strcmp(path, "/") == 0) {
+		st->st_mode = S_IFDIR;
+                ret = 0;
+                goto end;
+	}
+
         pe = g_hash_table_lookup(hash, path);
         if (! pe) {
                 pe = pentry_new();
@@ -256,7 +259,11 @@ dfs_getattr(const char *path,
                         ret = -1;
                         goto end;
                 }
+                LOG(LOG_DEBUG, "before g_hash_table_insert()");
+                hash_print_all();
                 g_hash_table_insert(hash, key, pe);
+                LOG(LOG_DEBUG, "after g_hash_table_insert()");
+                hash_print_all();
         }
 
         int (*cb[]) (pentry_t *, const char *, struct stat *) = {
