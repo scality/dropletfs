@@ -88,6 +88,20 @@ env_set_gc_age_threshold(struct conf *conf)
 }
 
 static void
+env_set_sc_loop_delay(struct conf *conf)
+{
+        (void)env_generic_set_int(&conf->sc_loop_delay,
+                                  "DROPLETFS_SC_LOOP_DELAY");
+}
+
+static void
+env_set_sc_age_threshold(struct conf *conf)
+{
+        (void)env_generic_set_int(&conf->sc_age_threshold,
+                                  "DROPLETFS_SC_AGE_THRESHOLD");
+}
+
+static void
 env_set_compression_method(struct conf *conf)
 {
         (void)env_generic_set_str(&conf->compression_method,
@@ -127,5 +141,7 @@ env_override_conf(struct conf *conf)
         env_set_max_retry(conf);
         env_set_gc_loop_delay(conf);
         env_set_gc_age_threshold(conf);
+        env_set_sc_loop_delay(conf);
+        env_set_sc_age_threshold(conf);
         env_set_exclusion_pattern(conf);
 }

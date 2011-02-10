@@ -10,6 +10,8 @@ struct conf {
         int zlib_level; /* from 1 to 9 */
         int gc_loop_delay; /* in seconds */
         int gc_age_threshold; /* in seconds */
+        int sc_loop_delay; /* in seconds */
+        int sc_age_threshold; /* in seconds */
         int max_retry; /* before a timeout */
         int log_level; /* from sys/syslog.h */
         struct re regex; /* do not upload files matching this regex */

@@ -35,11 +35,18 @@ Then go to the dropletfs-fuse directory, and type:
 the Droplet library is installed in /usr/local/lib by default, so you may have
 to set LD_LIBRARY_PATH to this value before running dplfs.
 
+
  - Compression
 
 You can set DROPLETFS_COMPRESSION_METHOD to ZLIB, to reduce the network load.
 Default value is NONE. The default compression level is 3. You can change it
 through DROPLETFS_ZLIB_LEVEL.
+
+You can set this value in your $HOME/.dplfsrc file:
+
+compression_method = zlib
+compression_level = 3
+
 
  - Cache directory
 
@@ -49,6 +56,11 @@ set it to a directory in a partition with a bunch of available GB.
 
 You can change its value through DROPLETFS_CACHE_DIR.  Default is /tmp.
 
+Also, in you configuration file:
+
+cache_dir = /tmp
+
+
  - Garbage collection
 
 DROPLETFS_GC_AGE_THRESHOLD (in seconds): a cache file older than this value
@@ -56,6 +68,31 @@ will be removed.  If zero, the garbage collection is not triggered. Default
 is 900.
 DROPLETFS_GC_LOOP_DELAY (in seconds): the GC is invoked with this period.
 Default is 60.
+
+In your configuration file:
+
+gc_age_threshold = 900
+gc_loop_delay = 60
+
+
+ - Smart metadada cache system
+
+The main goal of this functionnality is to increase the responsiveness,
+for example when you type 'ls -l' with a slow bandwidth. Or when your
+directories are filled with many entries.
+
+You can use the following environment variables:
+DROPLETFS_SC_LOOP_DELAY: periodic update of metadata, in seconds. The
+default value is 30.
+DROPLETFS_SC_AGE_THRESHOLD: updates files 'older' than this, in seconds,
+where 'older' means 'was not accessed after in the last N seconds'. The
+default value is 10.
+
+In your configuration file:
+
+sc_loop_delay = 30
+sc_age_threshold = 10
+
 
  - Filename pattern exclusion
 
@@ -66,6 +103,10 @@ this, you can set DROPLETFS_EXCLUSION_PATTERN to a regular expression.
 For example, to exclude all the files ending in .tmp or .foo, type:
 
 $ export DROPLETFS_EXCLUSION_PATTERN='\.tmp$|\.foo$'
+
+In you configuration file:
+
+exclusion_pattern = '\.doc$'
 
 This feature is *experimental*, we do not recommend using it unless you know
 exactly what you're doing.

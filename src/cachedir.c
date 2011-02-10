@@ -94,7 +94,7 @@ cachedir_callback(gpointer key,
 
         LOG(LOG_DEBUG, "%s, age=%d sec, children=%d", path, (int)age, children);
 
-        if (age < 20)
+        if (age < conf->sc_age_threshold)
                 return;
 
         if (children > MAX_CHILDREN)
@@ -120,11 +120,14 @@ thread_cachedir(void *cb_arg)
 
         LOG(LOG_DEBUG, "entering thread");
 
+        if (! conf->sc_loop_delay && ! conf->sc_age_threshold)
+                return NULL;
+
         while (1) {
                 LOG(LOG_DEBUG, "updating cache directories");
                 g_hash_table_foreach(hash, cachedir_callback, hash);
                 /* TODO: 3 should be a parameter */
-                sleep(10);
+                sleep(conf->sc_loop_delay);
         }
 
         return NULL;

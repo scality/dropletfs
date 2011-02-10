@@ -13,13 +13,15 @@
 
 #define DEFAULT_CONFIG_FILE ".dplfsrc"
 
-#define DEFAULT_COMPRESSION_METHOD "NONE"
-#define DEFAULT_ZLIB_LEVEL 3
+#define DEFAULT_COMPRESSION_METHOD "NONE" /* "ZLIB" or "NONE" "*/
+#define DEFAULT_ZLIB_LEVEL 3 /* from 0 to 9 */
 #define DEFAULT_CACHE_DIR "/tmp"
 #define DEFAULT_MAX_RETRY 5
-#define DEFAULT_GC_LOOP_DELAY 60
-#define DEFAULT_GC_AGE_THRESHOLD 900
-#define DEFAULT_LOG_LEVEL LOG_ERR
+#define DEFAULT_GC_LOOP_DELAY 60 /* 'garbage collector', in seconds */
+#define DEFAULT_GC_AGE_THRESHOLD 900 /* seconds */
+#define DEFAULT_SC_LOOP_DELAY 30 /* 'smart cache', in seconds */
+#define DEFAULT_SC_AGE_THRESHOLD 10 /* seconds */
+#define DEFAULT_LOG_LEVEL LOG_ERR /* cf syslog levels */
 #define DEFAULT_LOG_LEVEL_STR STRIZE(DEFAULT_LOG_LEVEL)
 #define DEFAULT_EXCLUSION_REGEXP NULL
 
@@ -33,6 +35,10 @@
 #define GC_LOOP_DELAY_LEN strlen(GC_LOOP_DELAY)
 #define GC_AGE_THRESHOLD "gc_age_threshold"
 #define GC_AGE_THRESHOLD_LEN strlen(GC_AGE_THRESHOLD)
+#define SC_LOOP_DELAY "sc_loop_delay"
+#define SC_LOOP_DELAY_LEN strlen(SC_LOOP_DELAY)
+#define SC_AGE_THRESHOLD "sc_age_threshold"
+#define SC_AGE_THRESHOLD_LEN strlen(SC_AGE_THRESHOLD)
 #define CACHE_DIR "cache_dir"
 #define CACHE_DIR_LEN strlen(CACHE_DIR)
 #define EXCLUSION_PATTERN "exclusion_pattern"
@@ -308,6 +314,20 @@ parse_token(struct conf * conf,
 
         if (! strncasecmp(token, GC_AGE_THRESHOLD, GC_AGE_THRESHOLD_LEN)) {
                 if (-1 == parse_int(&conf->gc_age_threshold, token)) {
+                        ret = -1;
+                        goto err;
+                }
+        }
+
+        if (! strncasecmp(token, SC_LOOP_DELAY, SC_LOOP_DELAY_LEN)) {
+                if (-1 == parse_int(&conf->sc_loop_delay, token)) {
+                        ret = -1;
+                        goto err;
+                }
+        }
+
+        if (! strncasecmp(token, SC_AGE_THRESHOLD, SC_AGE_THRESHOLD_LEN)) {
+                if (-1 == parse_int(&conf->sc_age_threshold, token)) {
                         ret = -1;
                         goto err;
                 }
