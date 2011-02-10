@@ -130,6 +130,8 @@ conf_log(struct conf *conf)
         LOG(LOG_ERR, "max number I/O attempts: %d", conf->max_retry);
         LOG(LOG_ERR, "gc loop delay: %d", conf->gc_loop_delay);
         LOG(LOG_ERR, "gc age threshold: %d", conf->gc_age_threshold);
+        LOG(LOG_ERR, "sc loop delay: %d", conf->sc_loop_delay);
+        LOG(LOG_ERR, "sc age threshold: %d", conf->sc_age_threshold);
         LOG(LOG_ERR, "debug level: %d (%s)",
             conf->log_level, log_level_to_str(conf->log_level));
         LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
@@ -471,6 +473,8 @@ conf_ctor_default(struct conf *conf,
         conf->zlib_level = DEFAULT_ZLIB_LEVEL;
         conf->gc_loop_delay = DEFAULT_GC_LOOP_DELAY;
         conf->gc_age_threshold = DEFAULT_GC_AGE_THRESHOLD;
+        conf->sc_loop_delay = DEFAULT_SC_LOOP_DELAY;
+        conf->sc_age_threshold = DEFAULT_SC_AGE_THRESHOLD;
         conf->max_retry = DEFAULT_MAX_RETRY;
         conf->log_level = DEFAULT_LOG_LEVEL;
         re_ctor(&conf->regex, NULL, REG_EXTENDED);
