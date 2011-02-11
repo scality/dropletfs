@@ -75,7 +75,7 @@ gc_age_threshold = 900
 gc_loop_delay = 60
 
 
- - Smart metadada cache system
+ - Smart metadata cache system
 
 The main goal of this functionnality is to increase the responsiveness,
 for example when you type 'ls -l' with a slow bandwidth. Or when your
