@@ -184,7 +184,58 @@ cachedir_callback(gpointer key,
         return;
 }
 
+static void
+root_dir_preload(GHashTable *hash)
+{
+        char *root_dir = "/";
+        void *dir_hdl = NULL;
+        dpl_dirent_t dirent;
+        dpl_status_t rc = DPL_FAILURE;
+        pentry_t *pe = NULL;
+        char *direntname = NULL;
+        char *key = NULL;
+        struct stat st;
 
+        pe = g_hash_table_lookup(hash, root_dir);
+        if (! pe) {
+                pe = pentry_new();
+                if (! pe) {
+                        LOG(LOG_ERR, "%s: can't add a new cell", root_dir);
+                        goto err;
+                }
+                pentry_set_path(pe, root_dir);
+                key = strdup(root_dir);
+                if (! key) {
+                        LOG(LOG_ERR, "%s: strdup: %s",
+                            root_dir, strerror(errno));
+                        pentry_free(pe);
+                        goto err;
+                }
+                g_hash_table_insert(hash, key, pe);
+        }
+
+        rc = dfs_chdir_timeout(ctx, root_dir);
+        if (DPL_SUCCESS != rc) {
+                LOG(LOG_ERR, "dfs_chdir_timeout: %s", dpl_status_str(rc));
+                goto err;
+        }
+
+        rc = dfs_opendir_timeout(ctx, ".", &dir_hdl);
+        if (DPL_SUCCESS != rc) {
+                LOG(LOG_ERR, "dfs_opendir_timeout: %s", dpl_status_str(rc));
+                goto err;
+        }
+
+        while (DPL_SUCCESS == dpl_readdir(dir_hdl, &dirent)) {
+                direntname = tmpstr_printf("%s%s", root_dir, dirent.name);
+                memset(&st, 0, sizeof st);
+                (void)dfs_getattr(direntname, &st);
+        }
+
+  err:
+        if (dir_hdl)
+                dpl_closedir(dir_hdl);
+}
 
 void *
 thread_cachedir(void *cb_arg)
@@ -195,6 +246,8 @@ thread_cachedir(void *cb_arg)
 
         if (! conf->sc_loop_delay && ! conf->sc_age_threshold)
                 return NULL;
+
+        root_dir_preload(hash);
 
         while (1) {
                 LOG(LOG_DEBUG, "updating cache directories");
