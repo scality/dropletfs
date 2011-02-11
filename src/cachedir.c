@@ -232,6 +232,7 @@ root_dir_preload(GHashTable *hash)
                 (void)dfs_getattr(direntname, &st);
         }
 
+        pentry_set_atime(pe);
   err:
         if (dir_hdl)
                 dpl_closedir(dir_hdl);
