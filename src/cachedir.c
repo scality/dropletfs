@@ -150,6 +150,7 @@ cachedir_callback(gpointer key,
         time_t age;
         pthread_t update_md;
         pthread_attr_t update_md_attr;
+        int total_size;
 
         LOG(LOG_DEBUG, "Entering function");
 
@@ -160,6 +161,11 @@ cachedir_callback(gpointer key,
         age = time(NULL) - pentry_get_atime(pe);
 
         LOG(LOG_DEBUG, "%s, age=%d sec, children=%d", path, (int)age, children);
+
+        /* 64 is a bold estimation of a path length */
+        total_size = g_hash_table_size(hash) * (pentry_sizeof() + 64);
+        if (total_size > conf->hashtable_max_size)
+                return;
 
         if (age < conf->sc_age_threshold)
                 return;

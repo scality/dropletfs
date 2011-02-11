@@ -28,6 +28,7 @@ enum {
 
 void hash_print_all(void);
 
+size_t pentry_sizeof(void);
 pentry_t *pentry_new(void);
 void pentry_free(pentry_t *);
 

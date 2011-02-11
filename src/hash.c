@@ -31,6 +31,11 @@ struct pentry {
         time_t atime;
 };
 
+size_t
+pentry_sizeof(void)
+{
+        return sizeof (struct pentry);
+}
 
 pentry_t *
 pentry_new(void)

@@ -121,6 +121,13 @@ env_set_max_retry(struct conf *conf)
 }
 
 static void
+env_set_hashtable_max_size(struct conf *conf)
+{
+        (void)env_generic_set_int(&conf->hashtable_max_size,
+                                  "DROPLETFS_HASHTABLE_MAX_SIZE");
+}
+
+static void
 env_set_exclusion_pattern(struct conf *conf)
 {
         char *tmp = NULL;
@@ -144,4 +151,5 @@ env_override_conf(struct conf *conf)
         env_set_sc_loop_delay(conf);
         env_set_sc_age_threshold(conf);
         env_set_exclusion_pattern(conf);
+        env_set_hashtable_max_size(conf);
 }

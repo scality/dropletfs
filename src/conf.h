@@ -14,6 +14,7 @@ struct conf {
         int sc_age_threshold; /* in seconds */
         int max_retry; /* before a timeout */
         int log_level; /* from sys/syslog.h */
+        int hashtable_max_size; /* in bytes */
         struct re regex; /* do not upload files matching this regex */
         int debug;
 } *conf;
