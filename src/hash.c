@@ -88,6 +88,7 @@ pentry_new(void)
         pe->path = NULL;
         pe->exclude = 0;
         pe->flag = FLAG_DIRTY;
+
         return pe;
 
   release:
@@ -111,6 +112,7 @@ pentry_free(pentry_t *pe)
         (void)sem_destroy(&pe->refcount);
 
         list_free(pe->dirent);
+
         free(pe);
 }
 
@@ -292,6 +294,9 @@ pentry_set_path(pentry_t *pe,
                 LOG(LOG_ERR, "empty path");
                 return;
         }
+
+        if (pe->path)
+                free(pe->path);
 
         pe->path = strdup(path);
         if (! pe->path)
