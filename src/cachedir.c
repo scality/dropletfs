@@ -193,7 +193,6 @@ thread_cachedir(void *cb_arg)
         while (1) {
                 LOG(LOG_DEBUG, "updating cache directories");
                 g_hash_table_foreach(hash, cachedir_callback, hash);
-                /* TODO: 3 should be a parameter */
                 sleep(conf->sc_loop_delay);
         }
 
