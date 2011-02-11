@@ -167,12 +167,18 @@ download_headers(char * path,
 }
 
 static int
-dfs_md5cmp(pentry_t *pe,
-           dpl_dict_t *dict)
+compare_digests(pentry_t *pe,
+                dpl_dict_t *dict)
 {
-        char *remote_md5 = NULL;
+        char *remote = NULL;
         int ret;
         char *digest = NULL;
+
+        if (FILE_LOCAL != pentry_get_placeholder(pe)) {
+                LOG(LOG_DEBUG, "no local file");
+                ret = -1;
+                goto err;
+        }
 
         digest = pentry_get_digest(pe);
         if (! digest) {
@@ -184,15 +190,16 @@ dfs_md5cmp(pentry_t *pe,
         print_metadata(dict);
         ret = -1;
 
-        remote_md5 = dpl_dict_get_value(dict, "etag");
-        if (remote_md5) {
-                LOG(LOG_DEBUG, "remote md5=%s", remote_md5);
-                LOG(LOG_DEBUG, "local md5=%.*s", MD5_DIGEST_LENGTH, digest);
-                if (0 == memcmp(digest, remote_md5, MD5_DIGEST_LENGTH)) {
-                        pentry_set_digest(pe, remote_md5);
-                        LOG(LOG_DEBUG, "updated local md5=%.*s",
-                            MD5_DIGEST_LENGTH, pentry_get_digest(pe));
+        remote = dpl_dict_get_value(dict, "etag");
+        if (remote) {
+                LOG(LOG_DEBUG, "remote md5=%s", remote);
+                LOG(LOG_DEBUG, "local md5=\"%.*s\"", MD5_DIGEST_LENGTH, digest);
+                if (0 == memcmp(digest, remote, MD5_DIGEST_LENGTH)) {
                         ret = 0;
+                } else {
+                        pentry_set_digest(pe, remote);
+                        LOG(LOG_DEBUG, "updated local md5=\"%.*s\"",
+                            MD5_DIGEST_LENGTH, pentry_get_digest(pe));
                 }
         }
 
@@ -297,7 +304,7 @@ handle_compression(const char *remote,
         return ret;
 }
 
-
+/* TODO: code a proper permission mechanism */
 static int
 check_permissions(pentry_t *pe,
                   dpl_dict_t *metadata)
@@ -318,7 +325,7 @@ dfs_get_local_copy(pentry_t *pe,
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
 
-        local = tmpstr_printf("%s/%s", conf->cache_dir, remote);
+        local = tmpstr_printf("%s%s", conf->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
             ctx->cur_bucket, remote, local);
 
@@ -356,7 +363,7 @@ dfs_get_local_copy(pentry_t *pe,
         /* If the remote MD5 matches a cache file, we don't have to download
          * it again, just return the (open) file descriptor of the cache file
          */
-        if (0 == dfs_md5cmp(pe, headers))  {
+        if (0 == compare_digests(pe, headers))  {
                 fd = pentry_get_fd(pe);
                 goto end;
         }
