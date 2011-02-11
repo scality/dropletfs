@@ -239,7 +239,7 @@ dfs_open(const char *path,
 
         mode = get_mode_from_flags(info->flags);
 
-        if (MODE_RDONLY != (info->flags & O_ACCMODE)) {
+        if (MODE_RDONLY != mode) {
                 if (pentry_lock(pe)) {
                         ret = -1;
                         pentry_dec_refcount(pe);
