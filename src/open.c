@@ -159,6 +159,7 @@ open_existing(const char * const path,
 
         /* negative fd? then we don't have any cache file, get it! */
         if (fd < 0) {
+                (void)build_cache_tree(path);
                 fd = dfs_get_local_copy(pe, path, flags);
                 if (-1 == fd) {
                         ret = -1;
