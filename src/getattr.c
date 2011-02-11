@@ -259,11 +259,7 @@ dfs_getattr(const char *path,
                         ret = -1;
                         goto end;
                 }
-                LOG(LOG_DEBUG, "before g_hash_table_insert()");
-                hash_print_all();
                 g_hash_table_insert(hash, key, pe);
-                LOG(LOG_DEBUG, "after g_hash_table_insert()");
-                hash_print_all();
         }
 
         int (*cb[]) (pentry_t *, const char *, struct stat *) = {
