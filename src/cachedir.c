@@ -176,7 +176,7 @@ cachedir_callback(gpointer key,
         children++;
 
         pthread_attr_init(&update_md_attr);
-        pthread_attr_setdetachstate(&update_md_attr, PTHREAD_CREATE_JOINABLE);
+        pthread_attr_setdetachstate(&update_md_attr, PTHREAD_CREATE_DETACHED);
         pthread_create(&update_md, &update_md_attr, update_metadata, pe);
 
         children--;
