@@ -24,7 +24,7 @@
 #define DEFAULT_LOG_LEVEL LOG_ERR /* cf syslog levels */
 #define DEFAULT_LOG_LEVEL_STR STRIZE(DEFAULT_LOG_LEVEL)
 #define DEFAULT_EXCLUSION_REGEXP NULL
-#define DEFAULT_HASHTABLE_MAX_SIZE (10*1024*1024) /* 10MB */
+#define DEFAULT_CACHE_MAX_SIZE (10*1024*1024) /* 10MB */
 
 #define COMPRESSION_METHOD "compression_method"
 #define COMPRESSION_METHOD_LEN strlen(COMPRESSION_METHOD)
@@ -46,8 +46,8 @@
 #define EXCLUSION_PATTERN_LEN strlen(EXCLUSION_PATTERN)
 #define LOG_LEVEL "log_level"
 #define LOG_LEVEL_LEN strlen(LOG_LEVEL)
-#define HASHTABLE_MAX_SIZE "hashtable_max_size"
-#define HASHTABLE_MAX_SIZE_LEN strlen(HASHTABLE_MAX_SIZE)
+#define CACHE_MAX_SIZE "cache_max_size"
+#define CACHE_MAX_SIZE_LEN strlen(CACHE_MAX_SIZE)
 
 extern dpl_ctx_t *ctx;
 
@@ -135,7 +135,7 @@ conf_log(struct conf *conf)
         LOG(LOG_ERR, "gc age threshold: %d", conf->gc_age_threshold);
         LOG(LOG_ERR, "sc loop delay: %d", conf->sc_loop_delay);
         LOG(LOG_ERR, "sc age threshold: %d", conf->sc_age_threshold);
-        LOG(LOG_ERR, "hashtable max size: %d", conf->hashtable_max_size);
+        LOG(LOG_ERR, "cache max size: %d", conf->cache_max_size);
         LOG(LOG_ERR, "debug level: %d (%s)",
             conf->log_level, log_level_to_str(conf->log_level));
         LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
@@ -358,8 +358,8 @@ parse_token(struct conf * conf,
                 }
         }
 
-        if (! strncasecmp(token, HASHTABLE_MAX_SIZE, HASHTABLE_MAX_SIZE_LEN)) {
-                if (-1 == parse_int(&conf->hashtable_max_size, token)) {
+        if (! strncasecmp(token, CACHE_MAX_SIZE, CACHE_MAX_SIZE_LEN)) {
+                if (-1 == parse_int(&conf->cache_max_size, token)) {
                         ret = -1;
                         goto err;
                 }
@@ -488,7 +488,7 @@ conf_ctor_default(struct conf *conf,
         conf->sc_age_threshold = DEFAULT_SC_AGE_THRESHOLD;
         conf->max_retry = DEFAULT_MAX_RETRY;
         conf->log_level = DEFAULT_LOG_LEVEL;
-        conf->hashtable_max_size = DEFAULT_HASHTABLE_MAX_SIZE;
+        conf->cache_max_size = DEFAULT_CACHE_MAX_SIZE;
         re_ctor(&conf->regex, NULL, REG_EXTENDED);
 
         ret = 0;

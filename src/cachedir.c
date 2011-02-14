@@ -164,7 +164,7 @@ cachedir_callback(gpointer key,
 
         /* 64 is a bold estimation of a path length */
         total_size = g_hash_table_size(hash) * (pentry_sizeof() + 64);
-        if (total_size > conf->hashtable_max_size)
+        if (total_size > conf->cache_max_size)
                 return;
 
         if (age < conf->sc_age_threshold)
