@@ -38,7 +38,7 @@ dfs_create(const char *path,
                 goto err;
         }
 
-        exclude = re_match(&conf->regex, path);
+        exclude = re_matcher(&conf->regex, path);
 
         if (! exclude) {
                 ino = dpl_cwd(ctx, ctx->cur_bucket);

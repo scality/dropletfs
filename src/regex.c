@@ -52,8 +52,8 @@ void re_dtor(struct re *re)
 }
 
 int
-re_match(struct re *re,
-         const char *pattern)
+re_matcher(struct re *re,
+           const char *pattern)
 {
         int rc;
 

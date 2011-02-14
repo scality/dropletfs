@@ -12,6 +12,6 @@ struct re {
 int re_ctor(struct re *, const char *, int);
 void re_dtor(struct re *);
 
-int re_match(struct re *, const char *);
+int re_matcher(struct re *, const char *);
 
 #endif /* REGEX_H */
