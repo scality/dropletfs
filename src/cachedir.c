@@ -245,7 +245,7 @@ thread_cachedir(void *cb_arg)
 
         LOG(LOG_DEBUG, "entering thread");
 
-        if (! conf->sc_loop_delay && ! conf->sc_age_threshold)
+        if (! conf->sc_loop_delay || ! conf->sc_age_threshold)
                 return NULL;
 
         root_dir_preload(hash);
