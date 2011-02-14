@@ -67,6 +67,9 @@ env_generic_set_str(char **var,
                 goto end;
         }
 
+        if (*var)
+                free(*var);
+
         *var = aux;
         ret = 0;
   end:
@@ -128,6 +131,18 @@ env_set_cache_max_size(struct conf *conf)
 }
 
 static void
+env_set_log_level(struct conf *conf)
+{
+        char *tmp = NULL;
+
+        tmp = getenv("DROPLETFS_LOG_LEVEL");
+        if (! tmp || ! *tmp)
+                return;
+
+        conf->log_level = str_to_log_level(tmp);
+}
+
+static void
 env_set_exclusion_pattern(struct conf *conf)
 {
         char *tmp = NULL;
@@ -152,4 +167,5 @@ env_override_conf(struct conf *conf)
         env_set_sc_age_threshold(conf);
         env_set_exclusion_pattern(conf);
         env_set_cache_max_size(conf);
+        env_set_log_level(conf);
 }

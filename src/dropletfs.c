@@ -386,6 +386,23 @@ usage(const char * const prog)
         printf("\t[options]\tfuse/mount options\n");
 }
 
+static void
+conf_log(struct conf *conf)
+{
+        LOG(LOG_ERR, "zlib level: %d", conf->zlib_level);
+        LOG(LOG_ERR, "compression method: %s", conf->compression_method);
+        LOG(LOG_ERR, "local cache directory: %s", conf->cache_dir);
+        LOG(LOG_ERR, "max number I/O attempts: %d", conf->max_retry);
+        LOG(LOG_ERR, "gc loop delay: %d", conf->gc_loop_delay);
+        LOG(LOG_ERR, "gc age threshold: %d", conf->gc_age_threshold);
+        LOG(LOG_ERR, "sc loop delay: %d", conf->sc_loop_delay);
+        LOG(LOG_ERR, "sc age threshold: %d", conf->sc_age_threshold);
+        LOG(LOG_ERR, "cache max size: %d", conf->cache_max_size);
+        LOG(LOG_ERR, "debug level: %d (%s)",
+            conf->log_level, log_level_to_str(conf->log_level));
+        LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
+}
+
 int
 main(int argc,
      char **argv)

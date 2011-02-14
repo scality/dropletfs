@@ -19,11 +19,13 @@ struct conf {
         int debug;
 } *conf;
 
+char *log_level_to_str(int);
+int str_to_log_level(char *);
+
 struct conf *conf_new(void);
 int conf_ctor(struct conf *, char *, int);
 void conf_dtor(struct conf *);
 void conf_free(struct conf *);
-void conf_log(struct conf *);
 
 
 #endif /* CONF_H */

@@ -5,9 +5,9 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <syslog.h>
 
 #include "conf.h"
-#include "log.h"
 #include "tmpstr.h"
 #include "env.h"
 
@@ -51,7 +51,7 @@
 
 extern dpl_ctx_t *ctx;
 
-static char *
+char *
 log_level_to_str(int level)
 {
 #define case_log(x) case x: return #x
@@ -71,7 +71,7 @@ log_level_to_str(int level)
         return "INVALID";
 }
 
-static int
+int
 str_to_log_level(char *str)
 {
 #define case_str(prio) if (! strcmp(str, #prio)) return prio;
@@ -122,23 +122,6 @@ conf_free(struct conf *conf)
                 free(conf->cache_dir);
 
         free(conf);
-}
-
-void
-conf_log(struct conf *conf)
-{
-        LOG(LOG_ERR, "zlib level: %d", conf->zlib_level);
-        LOG(LOG_ERR, "compression method: %s", conf->compression_method);
-        LOG(LOG_ERR, "local cache directory: %s", conf->cache_dir);
-        LOG(LOG_ERR, "max number I/O attempts: %d", conf->max_retry);
-        LOG(LOG_ERR, "gc loop delay: %d", conf->gc_loop_delay);
-        LOG(LOG_ERR, "gc age threshold: %d", conf->gc_age_threshold);
-        LOG(LOG_ERR, "sc loop delay: %d", conf->sc_loop_delay);
-        LOG(LOG_ERR, "sc age threshold: %d", conf->sc_age_threshold);
-        LOG(LOG_ERR, "cache max size: %d", conf->cache_max_size);
-        LOG(LOG_ERR, "debug level: %d (%s)",
-            conf->log_level, log_level_to_str(conf->log_level));
-        LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
 }
 
 static int
