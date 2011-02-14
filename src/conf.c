@@ -438,8 +438,7 @@ parse_file(struct conf * conf,
         fp = fopen(path, "r");
         if (! fp) {
                 fprintf(stderr, "No config file, use the factory settings\n");
-                ret = -1;
-                goto err;
+                goto end;
         }
 
         buf = tmpstr_new();
@@ -453,6 +452,7 @@ parse_file(struct conf * conf,
                 }
         }
 
+  end:
         ret = 0;
   err:
         return ret;
@@ -514,8 +514,7 @@ conf_ctor(struct conf *conf,
         tmp = getenv("HOME");
         if (! tmp) {
                 fprintf(stderr, "no HOME is set, use the default config\n");
-                ret = -1;
-                goto err;
+                goto end;
         }
 
         path = tmpstr_printf("%s/%s", tmp, DEFAULT_CONFIG_FILE);
@@ -524,15 +523,15 @@ conf_ctor(struct conf *conf,
          * pattern: <directory>/<bucket name> */
         if (-1 == conf_set_full_cache_dir(conf)) {
                 fprintf(stderr, "can't build the cache directory\n");
-                ret = -1;
-                goto err;
+                goto end;
         }
 
         if (-1 == parse_file(conf, path)) {
-                ret = -1;
-                goto err;
+                fprintf(stderr, "parse error\n");
+                goto end;
         }
 
+  end:
         ret = 0;
   err:
         env_override_conf(conf);
