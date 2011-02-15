@@ -16,6 +16,7 @@ struct conf {
         int log_level; /* from sys/syslog.h */
         int cache_max_size; /* in bytes */
         struct re regex; /* do not upload files matching this regex */
+        char *encryption_method; /* "aes" or "none" */
         int debug;
 } *conf;
 

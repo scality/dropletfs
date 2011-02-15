@@ -25,6 +25,7 @@
 #define DEFAULT_LOG_LEVEL_STR STRIZE(DEFAULT_LOG_LEVEL)
 #define DEFAULT_EXCLUSION_REGEXP NULL
 #define DEFAULT_CACHE_MAX_SIZE (10*1024*1024) /* 10MB */
+#define DEFAULT_ENCRYPTION_METHOD "NONE" /* "NONE" or "AES" */
 
 #define COMPRESSION_METHOD "compression_method"
 #define COMPRESSION_METHOD_LEN strlen(COMPRESSION_METHOD)
@@ -48,6 +49,8 @@
 #define LOG_LEVEL_LEN strlen(LOG_LEVEL)
 #define CACHE_MAX_SIZE "cache_max_size"
 #define CACHE_MAX_SIZE_LEN strlen(CACHE_MAX_SIZE)
+#define ENCRYPTION_METHOD "encryption_method"
+#define ENCRYPTION_METHOD_LEN strlen(ENCRYPTION_METHOD)
 
 extern dpl_ctx_t *ctx;
 
@@ -341,6 +344,13 @@ parse_token(struct conf * conf,
                 }
         }
 
+        if (! strncasecmp(token, ENCRYPTION_METHOD, ENCRYPTION_METHOD_LEN)) {
+                if (-1 == parse_str(&conf->encryption_method, token)) {
+                        ret = -1;
+                        goto err;
+                }
+        }
+
         if (! strncasecmp(token, CACHE_MAX_SIZE, CACHE_MAX_SIZE_LEN)) {
                 if (-1 == parse_int(&conf->cache_max_size, token)) {
                         ret = -1;
@@ -460,6 +470,12 @@ conf_ctor_default(struct conf *conf,
 
         conf->compression_method = strdup(DEFAULT_COMPRESSION_METHOD);
         if (! conf->compression_method) {
+                ret = -1;
+                goto err;
+        }
+
+        conf->encryption_method = strdup(DEFAULT_ENCRYPTION_METHOD);
+        if (! conf->encryption_method) {
                 ret = -1;
                 goto err;
         }

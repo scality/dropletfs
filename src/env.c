@@ -155,6 +155,13 @@ env_set_exclusion_pattern(struct conf *conf)
         (void)re_ctor(&conf->regex, tmp, REG_EXTENDED);
 }
 
+static void
+env_set_encryption_method(struct conf *conf)
+{
+        (void)env_generic_set_str(&conf->encryption_method,
+                                  "DROPLETFS_ENCRYPTION_METHOD");
+}
+
 void
 env_override_conf(struct conf *conf)
 {
@@ -168,4 +175,5 @@ env_override_conf(struct conf *conf)
         env_set_exclusion_pattern(conf);
         env_set_cache_max_size(conf);
         env_set_log_level(conf);
+        env_set_encryption_method(conf);
 }

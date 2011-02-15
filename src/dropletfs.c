@@ -390,6 +390,7 @@ static void
 conf_log(struct conf *conf)
 {
         LOG(LOG_ERR, "zlib level: %d", conf->zlib_level);
+        LOG(LOG_ERR, "encryption method: %s", conf->encryption_method);
         LOG(LOG_ERR, "compression method: %s", conf->compression_method);
         LOG(LOG_ERR, "local cache directory: %s", conf->cache_dir);
         LOG(LOG_ERR, "max number I/O attempts: %d", conf->max_retry);

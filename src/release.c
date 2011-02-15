@@ -98,6 +98,7 @@ dfs_release(const char *path,
         char *zlocal = NULL;
         FILE *fpsrc = NULL;
         FILE *fpdst = NULL;
+        unsigned flags = DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5;
 
         LOG(LOG_DEBUG, "path=%s, %s", path, flags_to_str(info->flags));
 
@@ -177,9 +178,14 @@ dfs_release(const char *path,
                 }
         }
 
+#define AES "aes"
+#define AES_LEN strlen(AES)
+        if (! strncasecmp(conf->encryption_method, AES, AES_LEN))
+                flags |= DPL_VFILE_FLAG_ENCRYPT;
+
         rc = dpl_openwrite(ctx,
                            (char *)path,
-                           DPL_VFILE_FLAG_CREAT|DPL_VFILE_FLAG_MD5,
+                           flags,
                            dict,
                            canned_acl,
                            size,

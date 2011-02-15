@@ -312,6 +312,40 @@ check_permissions(pentry_t *pe,
         return 0;
 }
 
+static unsigned int
+check_encryption_flag(dpl_dict_t *metadata)
+{
+        char *cipher = NULL;
+        char *cipher_type = NULL;
+        unsigned int ret = 0;
+
+        if (strncasecmp(conf->encryption_method, "aes", strlen("aes")))
+                goto end;
+
+        cipher = dpl_dict_get_value(metadata, "cipher");
+        cipher_type = dpl_dict_get_value(metadata, "cipher-type");
+
+        if (! cipher || ! cipher_type) {
+                ret = 0;
+                goto end;
+        }
+
+        if (strncasecmp(cipher, "yes", strlen("yes")))
+                ret = 0;
+                goto end;
+
+        if (strncasecmp(cipher_type, "aes-256-cfb", strlen("aes-256-cfb"))) {
+                LOG(LOG_ERR, "unsupported cipher-type: %s", cipher_type);
+                ret = 0;
+                goto end;
+        }
+
+        ret |= DPL_VFILE_FLAG_ENCRYPT;
+  end:
+        LOG(LOG_DEBUG, "flags = 0x%x", ret);
+        return ret;
+}
+
 /* return the fd of a local copy, to operate on */
 int
 dfs_get_local_copy(pentry_t *pe,
@@ -324,6 +358,7 @@ dfs_get_local_copy(pentry_t *pe,
         struct get_data get_data = { .fd = -1, .buf = NULL };
         dpl_status_t rc = DPL_FAILURE;
         char *local = NULL;
+        unsigned encryption = 0;
 
         local = tmpstr_printf("%s%s", conf->cache_dir, remote);
         LOG(LOG_DEBUG, "bucket=%s, path=%s, local=%s",
@@ -384,9 +419,11 @@ dfs_get_local_copy(pentry_t *pe,
                 goto end;
         }
 
+        encryption = check_encryption_flag(metadata);
+
         rc = dpl_openread(ctx,
                           (char *)remote,
-                          0u, /* no encryption */
+                          encryption,
                           NULL,
                           cb_get_buffered,
                           &get_data,

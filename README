@@ -94,6 +94,19 @@ sc_loop_delay = 30
 sc_age_threshold = 10
 
 
+ - Encryption
+
+Use the environment variable DROPLETFS_ENCRYPTION_METHOD.  Set it to
+"AES" is you want to encrypt your data, otherwise it will be in plain
+text.
+
+You can also set it in your configuration file (e.g. $HOME/.dplfsrc):
+
+encryption_method = aes
+
+The default value is "none".
+
+
  - Filename pattern exclusion
 
 In some specific cases, we do not want to upload some files on remote
