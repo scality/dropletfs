@@ -131,6 +131,20 @@ env_set_cache_max_size(struct conf *conf)
 }
 
 static void
+env_set_profiling(struct conf *conf)
+{
+        (void)env_generic_set_int(&conf->profiling,
+                                  "DROPLETFS_PROFILING");
+}
+
+static void
+env_set_profiling_logfile(struct conf *conf)
+{
+        (void)env_generic_set_str(&conf->profiling_logfile,
+                                  "DROPLETFS_PROFILING_LOGFILE");
+}
+
+static void
 env_set_log_level(struct conf *conf)
 {
         char *tmp = NULL;
@@ -176,4 +190,6 @@ env_override_conf(struct conf *conf)
         env_set_cache_max_size(conf);
         env_set_log_level(conf);
         env_set_encryption_method(conf);
+        env_set_profiling(conf);
+        env_set_profiling_logfile(conf);
 }

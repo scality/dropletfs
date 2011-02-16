@@ -12,6 +12,10 @@
 #define FUSE_USE_VERSION 29
 #include <fuse.h>
 
+#define __USE_GNU
+#include <dlfcn.h>
+#undef __USE_GNU
+
 #include "hash.h"
 #include "tmpstr.h"
 #include "log.h"
@@ -47,12 +51,71 @@
 #include "regex.h"
 #include "conf.h"
 #include "env.h"
+#include "utils.h"
 
 dpl_ctx_t *ctx = NULL;
 FILE *fp = NULL;
 mode_t root_mode = 0;
 GHashTable *hash = NULL;
 struct conf *conf = NULL;
+
+FILE *fp_log;
+static int log_started = 0;
+static int depth = 1;
+__thread struct timeval tv_enter;
+__thread struct timeval tv_exit;
+
+
+static void __attribute__((no_instrument_function))
+__cyg_profile_func_enter(void *this,
+                         void *call_site)
+{
+        Dl_info info;
+
+        if (! log_started || ! conf->profiling)
+                return;
+
+        dladdr(__builtin_return_address(0), &info);
+
+        if (! info.dli_sname)
+                return;
+
+        if (strncasecmp("dfs_", info.dli_sname, 4))
+                return;
+
+        gettimeofday(&tv_enter, NULL);
+
+        fprintf(fp_log, "%d.%06d %.*s %s@%p\n",
+                (int)tv_enter.tv_sec, (int)tv_enter.tv_usec,
+                depth, ">", info.dli_sname, this);
+        depth++;
+
+}
+
+static void __attribute__((no_instrument_function))
+__cyg_profile_func_exit(void *this,
+                        void *call_site)
+{
+        Dl_info info;
+
+        if (! log_started || ! conf->profiling)
+                return;
+
+        dladdr(__builtin_return_address(0), &info);
+
+        if (! info.dli_sname)
+                return;
+
+        if (strncasecmp("dfs_", info.dli_sname, 4))
+                return;
+
+        gettimeofday(&tv_exit, NULL);
+        depth--;
+        fprintf(fp_log, "%d.%06d %.*s %s@%p -- %dms\n",
+                (int)tv_exit.tv_sec, (int)tv_exit.tv_usec,
+                depth, "<", info.dli_sname, this,
+                time_diff(&tv_enter, &tv_exit));
+}
 
 
 /* Not implemented yet */
@@ -180,6 +243,11 @@ dfs_destroy(void *arg)
 {
         LOG(LOG_DEBUG, "%p", arg);
 
+        if (fp_log) {
+                fflush(fp_log);
+                fclose(fp_log);
+        }
+
         if (hash) {
                 LOG(LOG_DEBUG, "removing cache files");
                 g_hash_table_foreach(hash, cb_hash_unlink, NULL);
@@ -194,6 +262,7 @@ dfs_destroy(void *arg)
 
         LOG(LOG_DEBUG, "freeing libdroplet context");
 	dpl_free();
+
 }
 
 static int
@@ -402,6 +471,8 @@ conf_log(struct conf *conf)
         LOG(LOG_ERR, "debug level: %d (%s)",
             conf->log_level, log_level_to_str(conf->log_level));
         LOG(LOG_ERR, "exclusion regex: '%s'", conf->regex.str);
+        LOG(LOG_ERR, "profiling: %d", conf->profiling);
+        LOG(LOG_ERR, "profiling logfile: %s", conf->profiling_logfile);
 }
 
 int
@@ -413,7 +484,10 @@ main(int argc,
         dpl_status_t rc = DPL_FAILURE;
         int debug = 0;
 
+        log_started = 0;
+
         openlog("dplfs", LOG_CONS | LOG_NOWAIT | LOG_PID, LOG_USER);
+
 
         if (argc < 3) {
                 usage(argv[0]);
@@ -462,6 +536,15 @@ main(int argc,
         }
 
         conf_log(conf);
+
+        if (conf->profiling) {
+                fp_log = fopen(conf->profiling_logfile, "a");
+                if (! fp_log) {
+                        LOG(LOG_ERR, "fopen(%s): %s",
+                            conf->profiling_logfile, strerror(errno));
+                }
+                log_started = 1;
+        }
 
         struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
         rc = dfs_fuse_main(&args);

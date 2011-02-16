@@ -18,6 +18,8 @@ struct conf {
         struct re regex; /* do not upload files matching this regex */
         char *encryption_method; /* "aes" or "none" */
         int debug;
+        int profiling;
+        char *profiling_logfile;
 } *conf;
 
 char *log_level_to_str(int);

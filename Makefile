@@ -11,6 +11,7 @@ GLIB_LDFLAGS=$(shell pkg-config --libs glib-2.0)
 
 CPPFLAGS+=
 LDFLAGS+=-ldroplet 		\
+	-ldl			\
 	-lssl			\
 	-lxml2			\
 	$(FUSE_LDFLAGS)		\
@@ -28,7 +29,8 @@ CFLAGS+=-Winline -Wundef -Wnested-externs
 CFLAGS+=-Wconversion
 # CFLAGS+=-Wwrite-strings
 CFLAGS+=-Wno-conversion -Wfloat-equal -Wuninitialized
-CFLAGS+=-g -ggdb3 -O2
+CFLAGS+=-finstrument-functions -Wno-unused
+CFLAGS+=-g -ggdb3 -O0 -fPIC
 
 CFLAGS+=$(FUSE_CFLAGS) $(GLIB_CFLAGS) $(DPL_CFLAGS)
 
