@@ -6,8 +6,8 @@ DPL_CFLAGS=-I$(DPL_INC_DIR) -L$(DPL_LIB_DIR)
 FUSE_CFLAGS=$(shell pkg-config fuse --cflags)
 FUSE_LDFLAGS=$(shell pkg-config fuse --libs)
 
-GLIB_CFLAGS=$(shell pkg-config --cflags glib-2.0)
-GLIB_LDFLAGS=$(shell pkg-config --libs glib-2.0)
+GLIB_CFLAGS=$(shell pkg-config --cflags gthread-2.0)
+GLIB_LDFLAGS=$(shell pkg-config --libs gthread-2.0)
 
 CPPFLAGS+=
 LDFLAGS+=-ldroplet 		\

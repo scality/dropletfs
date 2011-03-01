@@ -21,6 +21,7 @@
 extern struct conf *conf;
 extern dpl_ctx_t *ctx;
 extern GHashTable *hash;
+GThreadPool *pool;
 
 static void
 cb_map_dirents(void *elem, void *cb_arg)
@@ -78,18 +79,20 @@ cb_map_dirents(void *elem, void *cb_arg)
 
 }
 
-static void *
-update_metadata(void *cb_arg)
+static void
+update_md(gpointer data,
+          gpointer user_data)
 {
         pentry_t *pe = NULL;
         char *path = NULL;
         dpl_ftype_t type;
-        dpl_ino_t ino, parent_ino, obj_ino;
+        dpl_ino_t ino;
         dpl_status_t rc;
         dpl_dict_t *metadata = NULL;
         struct list *dirent = NULL;
 
-        pe = cb_arg;
+        (void)user_data;
+        pe = data;
         path = pentry_get_path(pe);
 
         LOG(LOG_DEBUG, "path=%s", path);
@@ -97,11 +100,10 @@ update_metadata(void *cb_arg)
         ino = dpl_cwd(ctx, ctx->cur_bucket);
 
         rc = dfs_namei_timeout(ctx, path, ctx->cur_bucket,
-                               ino, &parent_ino, &obj_ino, &type);
+                               ino, NULL, NULL, &type);
 
-        LOG(LOG_DEBUG, "path=%s, dpl_namei: %s, type=%s, parent_ino=%s, obj_ino=%s",
-            path, dpl_status_str(rc), ftype_to_str(type),
-            parent_ino.key, obj_ino.key);
+        LOG(LOG_DEBUG, "path=%s, dpl_namei: %s, type=%s",
+            path, dpl_status_str(rc), ftype_to_str(type));
 
         if (DPL_SUCCESS != rc) {
                 LOG(LOG_NOTICE, "dfs_namei_timeout: %s", dpl_status_str(rc));
@@ -133,9 +135,6 @@ update_metadata(void *cb_arg)
   end:
         if (metadata)
                 dpl_dict_free(metadata);
-
-        pthread_exit(NULL);
-        return NULL;
 }
 
 static void
@@ -143,13 +142,10 @@ cachedir_callback(gpointer key,
                   gpointer value,
                   gpointer user_data)
 {
-        static int children;
         GHashTable *hash = NULL;
         char *path = NULL;
         pentry_t *pe = NULL;
         time_t age;
-        pthread_t update_md;
-        pthread_attr_t update_md_attr;
         int total_size;
 
         LOG(LOG_DEBUG, "Entering function");
@@ -160,7 +156,7 @@ cachedir_callback(gpointer key,
 
         age = time(NULL) - pentry_get_atime(pe);
 
-        LOG(LOG_DEBUG, "%s, age=%d sec, children=%d", path, (int)age, children);
+        LOG(LOG_DEBUG, "%s, age=%d sec", path, (int)age);
 
         /* 64 is a bold estimation of a path length */
         total_size = g_hash_table_size(hash) * (pentry_sizeof() + 64);
@@ -170,85 +166,27 @@ cachedir_callback(gpointer key,
         if (age < conf->sc_age_threshold)
                 return;
 
-        if (children > MAX_CHILDREN)
-                return;
-
-        children++;
-
-        pthread_attr_init(&update_md_attr);
-        pthread_attr_setdetachstate(&update_md_attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&update_md, &update_md_attr, update_metadata, pe);
-
-        children--;
+        g_thread_pool_push(pool, pe, NULL);
 
         return;
-}
-
-static void
-root_dir_preload(GHashTable *hash)
-{
-        char *root_dir = "/";
-        void *dir_hdl = NULL;
-        dpl_dirent_t dirent;
-        dpl_status_t rc = DPL_FAILURE;
-        pentry_t *pe = NULL;
-        char *direntname = NULL;
-        char *key = NULL;
-        struct stat st;
-
-        pe = g_hash_table_lookup(hash, root_dir);
-        if (! pe) {
-                pe = pentry_new();
-                if (! pe) {
-                        LOG(LOG_ERR, "%s: can't add a new cell", root_dir);
-                        goto err;
-                }
-                pentry_set_path(pe, root_dir);
-                key = strdup(root_dir);
-                if (! key) {
-                        LOG(LOG_ERR, "%s: strdup: %s",
-                            root_dir, strerror(errno));
-                        pentry_free(pe);
-                        goto err;
-                }
-                g_hash_table_insert(hash, key, pe);
-        }
-
-        rc = dfs_chdir_timeout(ctx, root_dir);
-        if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dfs_chdir_timeout: %s", dpl_status_str(rc));
-                goto err;
-        }
-
-        rc = dfs_opendir_timeout(ctx, ".", &dir_hdl);
-        if (DPL_SUCCESS != rc) {
-                LOG(LOG_ERR, "dfs_opendir_timeout: %s", dpl_status_str(rc));
-                goto err;
-        }
-
-        while (DPL_SUCCESS == dpl_readdir(dir_hdl, &dirent)) {
-                direntname = tmpstr_printf("%s%s", root_dir, dirent.name);
-                memset(&st, 0, sizeof st);
-                (void)dfs_getattr(direntname, &st);
-        }
-
-        pentry_set_atime(pe);
-  err:
-        if (dir_hdl)
-                dpl_closedir(dir_hdl);
 }
 
 void *
 thread_cachedir(void *cb_arg)
 {
         GHashTable *hash = cb_arg;
+        GError *err = NULL;
 
         LOG(LOG_DEBUG, "entering thread");
 
         if (! conf->sc_loop_delay || ! conf->sc_age_threshold)
                 return NULL;
 
-        root_dir_preload(hash);
+        pool = g_thread_pool_new(update_md, NULL, 50, FALSE, &err);
+        if (err) {
+                LOG(LOG_ERR, "can't init thread pool: %s", err->message);
+                goto err;
+        }
 
         while (1) {
                 LOG(LOG_DEBUG, "updating cache directories");
@@ -256,5 +194,6 @@ thread_cachedir(void *cb_arg)
                 sleep(conf->sc_loop_delay);
         }
 
+  err:
         return NULL;
 }

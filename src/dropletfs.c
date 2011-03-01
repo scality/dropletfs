@@ -456,6 +456,9 @@ main(int argc,
 
         droplet_pp(ctx);
 
+        /* before calling any glib function in a multithreaded environment */
+        g_thread_init(NULL);
+
         conf = conf_new();
         if (! conf) {
                 fprintf(stderr, "can't allocate config\n");
