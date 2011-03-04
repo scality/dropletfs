@@ -19,8 +19,8 @@
 #define DEFAULT_MAX_RETRY 5
 #define DEFAULT_GC_LOOP_DELAY 60 /* 'garbage collector', in seconds */
 #define DEFAULT_GC_AGE_THRESHOLD 900 /* seconds */
-#define DEFAULT_SC_LOOP_DELAY 30 /* 'smart cache', in seconds */
-#define DEFAULT_SC_AGE_THRESHOLD 10 /* seconds */
+#define DEFAULT_SC_LOOP_DELAY 0 /* 'smart cache', in seconds */
+#define DEFAULT_SC_AGE_THRESHOLD 0 /* seconds */
 #define DEFAULT_LOG_LEVEL LOG_ERR /* cf syslog levels */
 #define DEFAULT_LOG_LEVEL_STR STRIZE(DEFAULT_LOG_LEVEL)
 #define DEFAULT_EXCLUSION_REGEXP NULL

@@ -83,15 +83,21 @@ directories are filled with many entries.
 
 You can use the following environment variables:
 DROPLETFS_SC_LOOP_DELAY: periodic update of metadata, in seconds. The
-default value is 30.
+default value is 0.
 DROPLETFS_SC_AGE_THRESHOLD: updates files 'older' than this, in seconds,
 where 'older' means 'was not accessed after in the last N seconds'. The
-default value is 10.
+default value is 0.
 
 In your configuration file:
 
 sc_loop_delay = 30
 sc_age_threshold = 10
+
+NOTE: default values were previously 30 and 10 seconds.  But since you
+may use dropletfs-fuse with you amazon s3 account, in order to avoid your
+account being heavily charged, I disabled the feature by default (nope,
+the LIST command is not free, so if you forgot to umount the device
+before sleeping, your banker won't be happy).
 
 
  - Encryption
