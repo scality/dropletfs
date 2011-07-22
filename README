@@ -150,6 +150,13 @@ Now, mount your cloud storage wherever you want, and enjoy!
 	-rw-r--r-- 1 poz poz     111 Dec 29 12:19 tmpstr.h
 	$
 
+5. UNINSTALLATION
+=================
+
+In the project directory, just type:
+
+	$ sudo make uninstall
+
 
 
 Please report bugs and comments to:
