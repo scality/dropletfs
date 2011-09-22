@@ -377,7 +377,7 @@ dfs_get_local_copy(pentry_t *pe,
                 goto end;
         }
 
-        if (DPL_FAILURE == dpl_get_metadata_from_headers(headers, metadata)) {
+        if (DPL_FAILURE == dpl_get_metadata_from_headers(ctx, headers, metadata)) {
                 LOG(LOG_ERR, "%s: metadata extraction failed", remote);
                 fd = -1;
                 goto end;
