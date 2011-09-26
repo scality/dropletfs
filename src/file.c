@@ -24,6 +24,8 @@ ftype_to_str(dpl_ftype_t type)
                 return "regular file";
         case DPL_FTYPE_DIR:
                 return "directory";
+        default:
+                return "unknown";
         }
         return "unknown type";
 }

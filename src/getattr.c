@@ -27,6 +27,9 @@ set_default_stat(struct stat *st,
         case DPL_FTYPE_REG:
                 st->st_mode |= (S_IFREG | S_IRUSR | S_IWUSR );
                 break;
+        default:
+                st->st_mode = 0;
+                break ;
         }
 
         st->st_uid = getuid();
