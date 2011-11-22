@@ -380,7 +380,7 @@ dfs_get_local_copy(pentry_t *pe,
         }
 
         if (DPL_FAILURE == dpl_get_metadata_from_headers(
-#if defined(DPL_VERSION_MAJOR) && defined(DPL_VERSION_MINOR) && DPL_VERSION_MAJOR >= 0 && DPL_VERSION_MINOR >= 2
+#if defined(DPL_VERSION_MAJOR) && defined(DPL_VERSION_MINOR) && (DPL_VERSION_MAJOR == 0 && DPL_VERSION_MINOR >= 2) || (DPL_VERSION_MAJOR > 0)
                                                          ctx,
 #endif
                                                          headers, metadata)) {
